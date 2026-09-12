@@ -73,6 +73,24 @@
     color: #3ac97a;
     font-weight: bold;
   }
+  .alert-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #ffe5e5;
+    color: #b3261e;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: bold;
+  }
+  .alert-banner button {
+    background: #b3261e;
+    color: #fff;
+    white-space: nowrap;
+  }
   .header-buttons {
     display: flex;
     gap: 10px;
@@ -230,6 +248,11 @@
   <span id="copyFeedback"></span>
 </div>
 
+<div id="alertBanner" class="alert-banner">
+  <span id="alertBannerText"></span>
+  <button onclick="location.reload()">ページを再読み込み</button>
+</div>
+
 <div id="timers"></div>
 
 <footer>同じ「クラス名」のリンクを開いた講師どうしだけで、タイマーの操作がリアルタイムに共有されます。別のクラス名を使えば、他のグループの授業とタイマーが混ざりません。</footer>
@@ -276,6 +299,22 @@ function copyRoomLink() {
   }).catch(() => {
     feedback.textContent = window.location.href;
   });
+}
+
+// ---- エラー表示(書き込みが失敗したときに気づけるようにする) ----
+function showAlert(message) {
+  const banner = document.getElementById("alertBanner");
+  const text = document.getElementById("alertBannerText");
+  text.textContent = message;
+  banner.style.display = "flex";
+}
+function hideAlert() {
+  document.getElementById("alertBanner").style.display = "none";
+}
+// Firebaseへの書き込みが失敗したときに共通で使うエラーハンドラ
+function onWriteError(err) {
+  console.error(err);
+  showAlert("操作がサーバーに反映できませんでした。通信が不安定な可能性があります。(" + (err && err.message ? err.message : err) + ")");
 }
 
 const colors = ["#3a6df0", "#f0973a", "#3ac97a", "#e14fd6", "#f0d23a", "#4fd6d6", "#f04f6f", "#8a5cf0"];
@@ -339,7 +378,7 @@ function addTimer(name = "", minutes = 3, seconds = 0) {
     baseTimestamp: Date.now(),
     running: false,
     finished: false
-  });
+  }).then(hideAlert).catch(onWriteError);
 }
 
 function addStopwatch(name = "") {
@@ -352,11 +391,11 @@ function addStopwatch(name = "") {
     baseTimestamp: Date.now(),
     running: false,
     finished: false
-  });
+  }).then(hideAlert).catch(onWriteError);
 }
 
 function removeTimer(id) {
-  timersRef.child(id).remove();
+  timersRef.child(id).remove().then(hideAlert).catch(onWriteError);
 }
 
 function startTimer(id) {
@@ -369,7 +408,7 @@ function startTimer(id) {
     baseTimestamp: Date.now(),
     running: true,
     finished: false
-  });
+  }).then(hideAlert).catch(onWriteError);
 }
 
 function pauseTimer(id) {
@@ -380,7 +419,7 @@ function pauseTimer(id) {
     baseSeconds: current,
     baseTimestamp: Date.now(),
     running: false
-  });
+  }).then(hideAlert).catch(onWriteError);
 }
 
 function resetTimer(id) {
@@ -393,7 +432,7 @@ function resetTimer(id) {
     baseTimestamp: Date.now(),
     running: false,
     finished: false
-  });
+  }).then(hideAlert).catch(onWriteError);
 }
 
 function setTime(id, minutes, seconds) {
@@ -405,11 +444,11 @@ function setTime(id, minutes, seconds) {
     baseSeconds: total,
     baseTimestamp: Date.now(),
     finished: false
-  });
+  }).then(hideAlert).catch(onWriteError);
 }
 
 function setName(id, name) {
-  timersRef.child(id).update({ name });
+  timersRef.child(id).update({ name }).then(hideAlert).catch(onWriteError);
 }
 
 function startAll() { timers.forEach(t => startTimer(t.id)); }
@@ -417,7 +456,7 @@ function pauseAll() { timers.forEach(t => pauseTimer(t.id)); }
 function resetAll() { timers.forEach(t => resetTimer(t.id)); }
 function removeAll() {
   if (timers.length && !confirm("すべてのタイマーを削除しますか？(他の講師の画面からも消えます)")) return;
-  timersRef.remove();
+  timersRef.remove().then(hideAlert).catch(onWriteError);
 }
 
 // ---- 描画 ----
@@ -488,7 +527,7 @@ function tick() {
         baseTimestamp: Date.now(),
         running: false,
         finished: true
-      });
+      }).catch(onWriteError);
     }
   });
 }
@@ -506,11 +545,23 @@ timersRef.on("value", (snapshot) => {
 });
 
 const statusEl = document.getElementById("syncStatus");
+let disconnectTimer = null;
 db.ref(".info/connected").on("value", (snap) => {
   if (snap.val() === true) {
     statusEl.textContent = "🟢 同期中";
+    if (disconnectTimer) {
+      clearTimeout(disconnectTimer);
+      disconnectTimer = null;
+    }
+    hideAlert();
   } else {
     statusEl.textContent = "🔴 接続待ち";
+    // 数秒待っても復帰しない場合だけ警告を出す(一瞬の再接続では表示しない)
+    if (!disconnectTimer) {
+      disconnectTimer = setTimeout(() => {
+        showAlert("サーバーとの接続が切れています。操作が反映されない場合はページを再読み込みしてください。");
+      }, 5000);
+    }
   }
 });
 </script>
