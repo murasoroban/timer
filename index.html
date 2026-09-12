@@ -2,2232 +2,588 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>そろばんシフト帳</title>
-<meta name="description" content="そろばんオンライン講師の希望シフト・確定シフト・出勤実績・給与を一つにまとめる管理ツール">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timer ⏰</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
   :root {
-    --paper: #F2F1EA;
-    --surface: #FFFFFF;
-    --surface-alt: #FBFAF4;
-    --ink-900: #1E2733;
-    --ink-700: #34465A;
-    --ink-500: #5B6B7C;
-    --ink-300: #93A0AC;
-    --line: #DEDACC;
-    --line-soft: #EAE7DC;
-    --indigo: #2B4C7E;
-    --indigo-deep: #1F3A62;
-    --indigo-soft: #E3EAF4;
-    --vermillion: #C1502F;
-    --vermillion-soft: #F7E3DA;
-    --success: #2E7D4F;
-    --success-soft: #DFF0E4;
-    --amber: #A5730A;
-    --amber-soft: #F5E7C8;
-    --rose: #AE3B49;
-    --rose-soft: #F5DFE1;
-    --shadow: 0 1px 2px rgba(30,39,51,0.06), 0 6px 20px -8px rgba(30,39,51,0.18);
-    --font-display: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif;
-    --font-body: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
-    color-scheme: light;
+    --bg: #f4f6fb;
+    --card-bg: #ffffff;
+    --text: #222;
+    --accent: #3a6df0;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper: #171B22;
-      --surface: #1F2530;
-      --surface-alt: #262D3A;
-      --ink-900: #ECEEF1;
-      --ink-700: #C7CDD6;
-      --ink-500: #9AA5B2;
-      --ink-300: #6C7885;
-      --line: #333C49;
-      --line-soft: #2A313D;
-      --indigo: #8FB0E0;
-      --indigo-deep: #B7CFEF;
-      --indigo-soft: #26344B;
-      --vermillion: #E38F6E;
-      --vermillion-soft: #3B2A22;
-      --success: #7BCB9A;
-      --success-soft: #1F3327;
-      --amber: #E8C06B;
-      --amber-soft: #3A2F17;
-      --rose: #E28D97;
-      --rose-soft: #3A2126;
-      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 30px -10px rgba(0,0,0,0.5);
-      color-scheme: dark;
-    }
-  }
-  :root[data-theme="dark"] {
-    --paper: #171B22;
-    --surface: #1F2530;
-    --surface-alt: #262D3A;
-    --ink-900: #ECEEF1;
-    --ink-700: #C7CDD6;
-    --ink-500: #9AA5B2;
-    --ink-300: #6C7885;
-    --line: #333C49;
-    --line-soft: #2A313D;
-    --indigo: #8FB0E0;
-    --indigo-deep: #B7CFEF;
-    --indigo-soft: #26344B;
-    --vermillion: #E38F6E;
-    --vermillion-soft: #3B2A22;
-    --success: #7BCB9A;
-    --success-soft: #1F3327;
-    --amber: #E8C06B;
-    --amber-soft: #3A2F17;
-    --rose: #E28D97;
-    --rose-soft: #3A2126;
-    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 30px -10px rgba(0,0,0,0.5);
-    color-scheme: dark;
-  }
-
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
   body {
-    background: var(--paper);
-    color: var(--ink-900);
-    font-family: var(--font-body);
+    margin: 0;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  header h1 {
+    font-size: 26px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #syncStatus, #roomBadge {
+    font-size: 12px;
+    font-weight: normal;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: #eef1fa;
+    color: #667;
+  }
+  .room-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .room-bar label {
+    font-size: 13px;
+    color: #667;
+    white-space: nowrap;
+  }
+  .room-bar input {
+    flex: 1;
+    min-width: 140px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  #copyFeedback {
+    font-size: 12px;
+    color: #3ac97a;
+    font-weight: bold;
+  }
+  .alert-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #ffe5e5;
+    color: #b3261e;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: bold;
+  }
+  .alert-banner button {
+    background: #b3261e;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .header-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
     font-size: 15px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
+    font-weight: bold;
+    transition: transform .08s ease, opacity .15s ease;
   }
-  h1, h2, h3, .display { font-family: var(--font-display); text-wrap: balance; }
-  button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
-  table { font-variant-numeric: tabular-nums; }
-  .num { font-variant-numeric: tabular-nums; }
-  a { color: var(--indigo); }
-  ::selection { background: var(--indigo-soft); }
+  button:active { transform: scale(0.96); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: #e2e6f0; color: #333; }
+  .btn-danger { background: #ff5a5a; color: #fff; }
+  .btn-small { padding: 6px 12px; font-size: 13px; }
 
-  [hidden] { display: none !important; }
-
-  /* ---------- loading / gate screens ---------- */
-  .gate {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    flex-direction: column; gap: 16px; text-align: center; padding: 32px;
-  }
-  .gate .beads { display: flex; gap: 6px; }
-  .bead { width: 12px; height: 12px; border-radius: 50%; background: var(--vermillion); opacity: 0.35; animation: bead-pulse 1.2s ease-in-out infinite; }
-  .bead:nth-child(2) { animation-delay: .15s; }
-  .bead:nth-child(3) { animation-delay: .3s; }
-  .bead:nth-child(4) { animation-delay: .45s; }
-  .bead:nth-child(5) { animation-delay: .6s; }
-  @keyframes bead-pulse { 0%,100% { opacity:.3; transform: translateY(0);} 50% { opacity:1; transform: translateY(-4px);} }
-  @media (prefers-reduced-motion: reduce) { .bead { animation: none; opacity: .8; } }
-  .gate p { color: var(--ink-500); max-width: 34em; }
-
-  /* ---------- login ---------- */
-  .login-wrap {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px;
-  }
-  .login-card {
-    width: 100%; max-width: 760px; background: var(--surface); border: 1px solid var(--line);
-    border-radius: 18px; box-shadow: var(--shadow); overflow: hidden;
-  }
-  .login-head { padding: 32px 36px 24px; border-bottom: 1px solid var(--line-soft); }
-  .login-head .beads-row { display:flex; gap:5px; margin-bottom: 14px; }
-  .login-head .beads-row span { width: 9px; height: 9px; border-radius: 50%; background: var(--vermillion); }
-  .login-head .beads-row span:nth-child(4), .login-head .beads-row span:nth-child(5) { background: var(--indigo-soft); border:1px solid var(--line); }
-  .login-head h1 { font-size: 1.55rem; font-weight: 700; margin: 0 0 6px; letter-spacing: .01em; }
-  .login-head p { color: var(--ink-500); font-size: .9rem; margin: 0; }
-  .login-body { display: grid; grid-template-columns: 1fr 1fr; }
-  .login-col { padding: 26px 30px; }
-  .login-col + .login-col { border-left: 1px solid var(--line-soft); }
-  .login-col h2 { font-size: .78rem; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 14px; }
-  .instructor-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
-  .instructor-btn {
-    text-align: left; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line);
-    background: var(--surface-alt); cursor: pointer; font-size: .92rem; font-weight: 500;
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    transition: border-color .12s, background .12s;
-  }
-  .instructor-btn:hover { border-color: var(--indigo); background: var(--indigo-soft); }
-  .instructor-btn .arrow { color: var(--ink-300); }
-  .empty-note { color: var(--ink-500); font-size: .85rem; background: var(--surface-alt); border: 1px dashed var(--line); border-radius: 10px; padding: 14px; }
-  .admin-login-form { display: flex; flex-direction: column; gap: 10px; }
-  @media (max-width: 640px) { .login-body { grid-template-columns: 1fr; } .login-col + .login-col { border-left: none; border-top: 1px solid var(--line-soft); } }
-
-  /* ---------- form controls ---------- */
-  label { display: block; font-size: .78rem; font-weight: 600; color: var(--ink-500); margin-bottom: 5px; }
-  input[type="text"], input[type="date"], input[type="time"], input[type="number"], input[type="month"], select, textarea {
-    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px;
-    background: var(--surface); color: var(--ink-900); outline: none;
-  }
-  input:focus, select:focus, textarea:focus, button:focus-visible { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-soft); }
-  textarea { resize: vertical; min-height: 60px; }
-  .field { margin-bottom: 14px; }
-  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .field-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-  @media (max-width: 560px) { .field-row, .field-row3 { grid-template-columns: 1fr; } }
-  .radio-group { display: flex; gap: 8px; flex-wrap: wrap; }
-  .radio-chip { border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: .85rem; cursor: pointer; background: var(--surface-alt); font-weight: 500; }
-  .radio-chip input { display: none; }
-  .radio-chip.checked { background: var(--indigo); border-color: var(--indigo); color: #fff; }
-
-  button.btn { cursor: pointer; border-radius: 9px; padding: 10px 18px; font-weight: 700; font-size: .88rem; border: 1px solid transparent; transition: filter .12s, background .12s; }
-  button.btn:hover { filter: brightness(0.96); }
-  :root[data-theme="dark"] button.btn:hover, @media (prefers-color-scheme: dark) { }
-  .btn-primary { background: var(--indigo); color: #fff; }
-  .btn-primary:hover { background: var(--indigo-deep); }
-  .btn-outline { background: transparent; border-color: var(--line); color: var(--ink-700); }
-  .btn-outline:hover { border-color: var(--indigo); color: var(--indigo); }
-  .btn-danger { background: transparent; border-color: var(--rose); color: var(--rose); }
-  .btn-danger:hover { background: var(--rose-soft); }
-  .btn-danger.confirm-armed { background: var(--rose); color: #fff; }
-  .btn-sm { padding: 6px 12px; font-size: .78rem; border-radius: 7px; }
-  .btn-block { width: 100%; }
-  button.linklike { background: none; border: none; color: var(--indigo); cursor: pointer; font-size: .82rem; font-weight: 600; padding: 4px 0; }
-
-  /* ---------- app shell ---------- */
-  .shell { display: flex; min-height: 100vh; align-items: flex-start; }
-  .sidebar {
-    width: 250px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line);
-    padding: 20px 16px; display: flex; flex-direction: column; gap: 22px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
-  }
-  .brand { display: flex; align-items: center; gap: 9px; padding: 0 4px; }
-  .brand .beads-row { display:flex; gap:4px; }
-  .brand .beads-row span { width: 7px; height: 7px; border-radius: 50%; background: var(--vermillion); }
-  .brand span.word { font-family: var(--font-display); font-weight: 700; font-size: 1.02rem; letter-spacing: .01em; }
-  .identity-card { background: var(--surface-alt); border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; }
-  .identity-card .name { font-weight: 700; font-size: .95rem; margin-bottom: 3px; }
-  .role-pill { display: inline-flex; align-items: center; gap: 5px; font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; letter-spacing: .03em; }
-  .role-pill.instructor { background: var(--indigo-soft); color: var(--indigo); }
-  .role-pill.admin { background: var(--vermillion-soft); color: var(--vermillion); }
-  .identity-card button { margin-top: 10px; }
-  .nav { display: flex; flex-direction: column; gap: 3px; }
-  .nav button {
-    display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: none;
-    padding: 10px 11px; border-radius: 9px; color: var(--ink-700); font-size: .88rem; font-weight: 500; cursor: pointer;
-  }
-  .nav button .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
-  .nav button:hover { background: var(--surface-alt); }
-  .nav button.active { background: var(--indigo-soft); color: var(--indigo); font-weight: 700; }
-  .nav button.active .dot { background: var(--indigo); }
-  .sidebar-foot { margin-top: auto; font-size: .72rem; color: var(--ink-300); padding: 0 4px; }
-
-  .main { flex: 1; min-width: 0; padding: 30px 36px 60px; }
-  .page-head { margin-bottom: 22px; }
-  .page-head h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 4px; }
-  .page-head p { color: var(--ink-500); font-size: .87rem; margin: 0; }
-
-  /* ---------- mobile menu (hamburger) ---------- */
-  .mobile-topbar { display: none; }
-  .sidebar-overlay { display: none; }
-  .sidebar-close { display: none; }
-
-  @media (max-width: 860px) {
-    .shell { flex-direction: column; }
-    .mobile-topbar {
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      position: sticky; top: 0; z-index: 30; background: var(--surface); border-bottom: 1px solid var(--line);
-      padding: 12px 14px;
-    }
-    .hamburger-btn {
-      position: relative; width: 40px; height: 40px; flex-shrink: 0; border-radius: 9px; border: 1px solid var(--line);
-      background: var(--surface-alt); cursor: pointer; display: flex; align-items: center; justify-content: center;
-    }
-    .hamburger-btn .bars, .hamburger-btn .bars::before, .hamburger-btn .bars::after {
-      content: ""; display: block; width: 18px; height: 2px; background: var(--ink-700); border-radius: 2px;
-    }
-    .hamburger-btn .bars { position: relative; }
-    .hamburger-btn .bars::before { position: absolute; top: -6px; left: 0; }
-    .hamburger-btn .bars::after { position: absolute; top: 6px; left: 0; }
-    .hamburger-btn .mb-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--vermillion); border: 2px solid var(--surface); }
-    .mobile-topbar .brand { padding: 0; }
-
-    .sidebar-overlay {
-      display: block; position: fixed; inset: 0; background: rgba(20, 20, 24, .45); z-index: 39;
-      opacity: 0; pointer-events: none; transition: opacity .2s ease;
-    }
-    .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
-
-    .sidebar {
-      position: fixed; top: 0; left: 0; height: 100vh; width: 80vw; max-width: 300px; z-index: 40;
-      transform: translateX(-100%); transition: transform .22s ease; box-shadow: 0 0 0 9999px transparent;
-    }
-    .sidebar.open { transform: translateX(0); box-shadow: 8px 0 24px rgba(20,20,24,.18); }
-    .sidebar .brand { display: none; }
-    .sidebar-close {
-      display: flex; align-items: center; justify-content: center; align-self: flex-end;
-      width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-alt);
-      cursor: pointer; font-size: 1rem; color: var(--ink-700); margin-bottom: -8px;
-    }
-    .nav { flex-direction: column; gap: 3px; }
-    .nav button span.label { white-space: normal; }
-    .sidebar-foot { display: block; }
-    .main { padding: 20px 16px 48px; }
+  #timers {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
   }
 
-  /* ---------- cards / layout blocks ---------- */
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; margin-bottom: 20px; box-shadow: var(--shadow); }
-  .card h2 { font-size: 1rem; font-weight: 700; margin: 0 0 3px; }
-  .card .card-sub { color: var(--ink-500); font-size: .82rem; margin: 0 0 16px; }
-  .two-col { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 20px; align-items: start; }
-  @media (max-width: 980px) { .two-col { grid-template-columns: 1fr; } }
-
-  /* ---------- table / list ---------- */
-  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  table.data { width: 100%; border-collapse: collapse; font-size: .86rem; }
-  table.data th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-300); font-weight: 700; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  table.data td { padding: 10px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
-  table.data tr:last-child td { border-bottom: none; }
-  table.data tbody tr:hover { background: var(--surface-alt); }
-  .cell-note { color: var(--ink-500); font-size: .8rem; }
-  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  @media (max-width: 480px) {
-    table.data { font-size: .78rem; }
-    table.data th, table.data td { padding: 7px 6px; }
-    .card { padding: 16px 15px; }
-    .page-head h1 { font-size: 1.28rem; }
-    .cal-nav { flex-wrap: wrap; }
+  .card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border-top: 8px solid var(--card-color, #3a6df0);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: background .25s ease;
+  }
+  .card.finished {
+    animation: flash 1s infinite;
+  }
+  @keyframes flash {
+    0%, 100% { background: #ffe5e5; }
+    50% { background: #ffffff; }
   }
 
-  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
-  .pill .dot { width: 6px; height: 6px; border-radius: 50%; }
-  .pill.pending { background: var(--amber-soft); color: var(--amber); }
-  .pill.pending .dot { background: var(--amber); }
-  .pill.approved, .pill.reflected { background: var(--success-soft); color: var(--success); }
-  .pill.approved .dot, .pill.reflected .dot { background: var(--success); }
-  .pill.rejected { background: var(--rose-soft); color: var(--rose); }
-  .pill.rejected .dot { background: var(--rose); }
-  .pill.normal { background: var(--indigo-soft); color: var(--indigo); }
-  .pill.normal .dot { background: var(--indigo); }
-  .pill.makeup { background: var(--vermillion-soft); color: var(--vermillion); }
-  .pill.makeup .dot { background: var(--vermillion); }
-  .pill.off { background: var(--surface-alt); color: var(--ink-500); border: 1px solid var(--line); }
-  .pill.off .dot { background: var(--ink-300); }
+  .name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .name-input {
+    flex: 1;
+    font-size: 20px;
+    font-weight: bold;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    padding: 4px 2px;
+    color: var(--text);
+  }
+  .name-input:focus {
+    outline: none;
+    border-bottom: 2px solid var(--accent);
+  }
+  .remove-btn {
+    background: transparent;
+    color: #aaa;
+    font-size: 18px;
+    padding: 2px 8px;
+  }
+  .remove-btn:hover { color: #ff5a5a; }
 
-  .empty-state { text-align: center; padding: 30px 16px; color: var(--ink-500); font-size: .85rem; }
-
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); }
-  .stat-card .label { font-size: .74rem; color: var(--ink-500); font-weight: 600; margin-bottom: 6px; }
-  .stat-card .value { font-size: 1.6rem; font-weight: 700; font-family: var(--font-display); }
-  .stat-card .unit { font-size: .78rem; color: var(--ink-500); font-weight: 500; margin-left: 3px; }
-
-  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
-  .toolbar .field { margin-bottom: 0; min-width: 150px; }
-
-  /* ---------- calendar ---------- */
-  .cal-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .cal-nav .cal-month-label { font-family: var(--font-display); font-weight: 700; font-size: 1.02rem; min-width: 7em; text-align: center; }
-  .cal-nav button.cal-arrow { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-alt); cursor: pointer; font-size: 1rem; color: var(--ink-700); }
-  .cal-nav button.cal-arrow:hover { border-color: var(--indigo); color: var(--indigo); }
-  .cal-head-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
-  .cal-weekday { text-align: center; font-size: .68rem; font-weight: 700; color: var(--ink-300); text-transform: uppercase; letter-spacing: .04em; padding: 2px 0; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .cal-cell { min-height: 68px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: 4px; text-align: left; font-size: .68rem; cursor: pointer; display: flex; flex-direction: column; gap: 2px; align-items: stretch; overflow: hidden; }
-  .cal-cell:hover { border-color: var(--indigo); }
-  .cal-cell.cal-empty { border-color: transparent; background: transparent; cursor: default; }
-  .cal-cell.cal-today { border-color: var(--indigo); box-shadow: inset 0 0 0 1px var(--indigo); }
-  .cal-cell.cal-selected { background: var(--indigo-soft); border-color: var(--indigo); }
-  .cal-daynum { font-weight: 700; font-size: .72rem; color: var(--ink-700); }
-  .cal-cell.cal-today .cal-daynum { color: var(--indigo); }
-  .cal-chip { background: var(--indigo-soft); color: var(--indigo); border-radius: 5px; padding: 1px 4px; font-size: .6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cal-chip.makeup { background: var(--vermillion-soft); color: var(--vermillion); }
-  .cal-more { font-size: .58rem; color: var(--ink-500); padding-left: 2px; }
-  .cal-day-detail { margin-top: 16px; }
-  .cal-day-detail h3 { font-size: .9rem; font-weight: 700; margin: 0 0 10px; }
-  .cal-legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0 0; font-size: .74rem; color: var(--ink-500); }
-  .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
-  .cal-legend .sw { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
-  @media (max-width: 560px) {
-    .cal-cell { min-height: 40px; padding: 3px; font-size: .6rem; }
-    .cal-chip, .cal-more { display: none; }
-    .cal-cell.cal-has { position: relative; }
-    .cal-cell.cal-has::after { content: ""; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%; background: var(--indigo); }
-    .cal-cell.cal-has.cal-has-makeup::after { background: var(--vermillion); }
-    .cal-weekday { font-size: .6rem; }
+  .time-display {
+    font-size: 56px;
+    font-weight: bold;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 2px;
+    padding: 8px 0;
+  }
+  .status-label {
+    text-align: center;
+    font-size: 14px;
+    color: #888;
+    min-height: 18px;
   }
 
-  /* ---------- notices ---------- */
-  .nav button .nav-badge { margin-left: auto; background: var(--vermillion); color: #fff; font-size: .66rem; font-weight: 700; border-radius: 999px; padding: 1px 7px; }
-  .notice-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; background: var(--surface); }
-  .notice-card.unread { border-color: var(--indigo); background: var(--indigo-soft); }
-  .notice-card .notice-title { font-weight: 700; margin-bottom: 4px; }
-  .notice-card .notice-meta { font-size: .72rem; color: var(--ink-500); margin-bottom: 8px; }
-  .notice-card .notice-body { font-size: .86rem; white-space: pre-wrap; }
-  .notice-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--indigo-soft); color: var(--indigo); border-radius: 10px; padding: 10px 14px; margin-bottom: 18px; font-size: .84rem; font-weight: 600; flex-wrap: wrap; }
-
-  .toast-stack { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 999; max-width: 320px; }
-  .toast { background: var(--ink-900); color: var(--paper); padding: 11px 16px; border-radius: 10px; font-size: .85rem; box-shadow: var(--shadow); animation: toast-in .18s ease-out; }
-  .toast.error { background: var(--rose); color: #fff; }
-  @keyframes toast-in { from { opacity: 0; transform: translateY(6px);} to { opacity:1; transform: translateY(0);} }
-
-  #versionBanner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 998; display: none; justify-content: center; padding: 14px; pointer-events: none; }
-  #versionBanner.show { display: flex; }
-  .version-banner-inner {
-    pointer-events: auto; max-width: 480px; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px;
-    background: var(--ink-900); color: var(--paper); padding: 12px 16px; border-radius: 14px; box-shadow: var(--shadow); font-size: .84rem; font-weight: 600;
+  .type-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #eef1fa;
+    color: #667;
+    align-self: flex-start;
   }
-  .version-banner-inner button { flex-shrink: 0; }
-  @media (max-width: 480px) { .version-banner-inner { flex-direction: column; align-items: stretch; text-align: center; } }
 
-  .divider { height: 1px; background: var(--line-soft); margin: 18px 0; }
-  .muted { color: var(--ink-500); }
-  .hint { font-size: .78rem; color: var(--ink-500); margin-top: 6px; }
+  .set-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .set-row input {
+    width: 56px;
+    font-size: 18px;
+    text-align: center;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+  }
+  .set-row span { color: #888; }
+
+  .presets {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+  }
+  .controls button { flex: 1; }
+
+  footer {
+    margin-top: 28px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
 
-<div id="root">
-  <div class="gate" id="gateScreen">
-    <div class="beads"><div class="bead"></div><div class="bead"></div><div class="bead"></div><div class="bead"></div><div class="bead"></div></div>
-    <p>読み込んでいます…</p>
+<header>
+  <h1>Timer ⏰ <span id="syncStatus">接続中...</span> <span id="roomBadge">ルーム: -</span></h1>
+  <div class="header-buttons">
+    <button class="btn-primary" onclick="addTimer()">＋ タイマーを追加</button>
+    <button class="btn-primary" onclick="addStopwatch()">＋ ストップウォッチを追加</button>
+    <button class="btn-secondary" onclick="startAll()">全部スタート</button>
+    <button class="btn-secondary" onclick="pauseAll()">全部一時停止</button>
+    <button class="btn-secondary" onclick="resetAll()">全部リセット</button>
+    <button class="btn-danger" onclick="removeAll()">全部削除</button>
   </div>
+</header>
+
+<div class="room-bar">
+  <label>クラス名(ルーム):</label>
+  <input id="roomInput" placeholder="例: さくら組" onkeydown="if(event.key==='Enter') switchRoom()">
+  <button class="btn-secondary btn-small" onclick="switchRoom()">このクラスを開く</button>
+  <button class="btn-secondary btn-small" onclick="copyRoomLink()">このクラスのリンクをコピー</button>
+  <span id="copyFeedback"></span>
 </div>
-<div class="toast-stack" id="toastStack"></div>
-<div id="versionBanner"></div>
 
-<!-- Firebase (Firestore=データ保存、Authentication=講師・管理者ごとのログインアカウント) -->
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script>
-  var firebaseConfig = {
-    apiKey: "AIzaSyDZpo9k_UvvuWePudzoH-PAWXHUUkHIL8Y",
-    authDomain: "soroban-shift.firebaseapp.com",
-    projectId: "soroban-shift",
-    storageBucket: "soroban-shift.firebasestorage.app",
-    messagingSenderId: "173793247752",
-    appId: "1:173793247752:web:c261f71d8e53036fba47bd"
-  };
-  firebase.initializeApp(firebaseConfig);
-  window.__firestoreDb = firebase.firestore();
-  window.__firebaseAuth = firebase.auth();
-  /* SESSION (not LOCAL): each browser tab keeps its own login, so an admin
-     and an instructor can be signed in side by side in separate tabs for
-     testing. The trade-off is that closing a tab (or the browser) signs
-     that tab out — everyone needs to log back in on their next visit. */
-  try { window.__firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION); } catch (e) {}
-</script>
+<div id="alertBanner" class="alert-banner">
+  <span id="alertBannerText"></span>
+  <button onclick="location.reload()">ページを再読み込み</button>
+</div>
+
+<div id="timers"></div>
+
+<footer>同じ「クラス名」のリンクを開いた講師どうしだけで、タイマーの操作がリアルタイムに共有されます。別のクラス名を使えば、他のグループの授業とタイマーが混ざりません。</footer>
 
 <script>
-(function () {
-  "use strict";
+// ---- Firebase 初期化(講師全員でリアルタイムに状態を共有するための設定) ----
+const firebaseConfig = {
+  apiKey: "AIzaSyClvaxIISe5P24nx8PkmY69ZOyzYku9-_A",
+  authDomain: "soroban-timer-fa104.firebaseapp.com",
+  databaseURL: "https://soroban-timer-fa104-default-rtdb.firebaseio.com",
+  projectId: "soroban-timer-fa104",
+  storageBucket: "soroban-timer-fa104.firebasestorage.app",
+  messagingSenderId: "511355630935",
+  appId: "1:511355630935:web:283c73f52b2f825acf3a12"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-  /* ============ constants ============ */
-  var INSTRUCTOR_TABS = [
-    { id: "avail", label: "シフト回答" },
-    { id: "myshifts", label: "確定シフト一覧" },
-    { id: "report", label: "実績提出" },
-    { id: "summary", label: "実績・給与目安" },
-    { id: "notices", label: "お知らせ" }
-  ];
-  var ADMIN_TABS = [
-    { id: "calls", label: "シフト募集・回答確認" },
-    { id: "shifts", label: "シフト一覧・作成" },
-    { id: "makeup", label: "振替授業を追加" },
-    { id: "approvals", label: "実績承認" },
-    { id: "notices", label: "お知らせ配信" },
-    { id: "payroll", label: "給与集計・講師管理" }
-  ];
+// ---- ルーム(クラス)ごとにデータを分ける ----
+// URLの ?room=クラス名 で共有範囲を分ける。指定がなければ "default" ルームを使う。
+const urlParams = new URLSearchParams(window.location.search);
+const roomId = (urlParams.get("room") || "default").trim() || "default";
+const timersRef = db.ref("rooms/" + encodeURIComponent(roomId) + "/timers");
 
-  /* Bump this string every time this file is edited and republished, so
-     viewers already on an older page get a "new version" prompt. Any
-     sortable string works (e.g. yyyyMMddHHmm). */
-  var APP_VERSION = "202609130900";
+document.getElementById("roomBadge").textContent = "ルーム: " + roomId;
+document.getElementById("roomInput").value = roomId === "default" ? "" : roomId;
 
-  /* ============ state ============ */
-  var state = {
-    db: null,
-    auth: null,
-    downloads: null,
-    role: null,          // 'instructor' | 'admin'
-    instructorId: null,
-    myName: null,
-    activeTab: null,
-    instructors: [],
-    shiftCalls: [],
-    availabilityResponses: [],
-    shifts: [],
-    workReports: [],
-    notifications: [],
-    roles: null,          // { adminUids: [...] }
-    authUser: undefined,  // undefined = not yet resolved, null = signed out, object = signed in (Firebase Auth user)
-    authReady: false,
-    ready: { instructors: false, shiftCalls: false, availabilityResponses: false, shifts: false, workReports: false, notifications: false, roles: false },
-    editingShiftId: null
-  };
-  function hasAnyAdmin() { return !!(state.roles && Array.isArray(state.roles.adminUids) && state.roles.adminUids.length > 0); }
-  function isUidAdmin(uid) { return !!(uid && state.roles && Array.isArray(state.roles.adminUids) && state.roles.adminUids.indexOf(uid) !== -1); }
-  function firebaseErrorMessage(err) {
-    var code = err && err.code;
-    if (code === "auth/wrong-password" || code === "auth/invalid-credential" || code === "auth/invalid-login-credentials") return "メールアドレスまたはパスワードが違います。";
-    if (code === "auth/user-not-found") return "アカウントが見つかりませんでした。";
-    if (code === "auth/email-already-in-use") return "このメールアドレスはすでに登録されています。";
-    if (code === "auth/weak-password") return "パスワードは6文字以上にしてください。";
-    if (code === "auth/invalid-email") return "メールアドレスの形式が正しくありません。";
-    if (code === "auth/too-many-requests") return "試行回数が多すぎます。しばらく待ってからお試しください。";
-    if (code === "auth/network-request-failed") return "通信エラーが発生しました。もう一度お試しください。";
-    if (code === "permission-denied") return "このアカウントはすでに別の講師として登録されているようです。管理者にご連絡ください。";
-    return "エラーが発生しました。もう一度お試しください。";
+function switchRoom() {
+  const name = document.getElementById("roomInput").value.trim();
+  const url = new URL(window.location.href);
+  if (name) {
+    url.searchParams.set("room", name);
+  } else {
+    url.searchParams.delete("room");
   }
-  /* Used by both the admin and instructor self-signup forms. Firebase Auth
-     account creation can succeed while a later linking write to Firestore
-     (settings/roles for admin, instructors/{id}.authUid for an instructor)
-     fails or never runs — leaving a stray account that exists but has no
-     app role, with "このメールアドレスはすでに登録されています" blocking any
-     retry. To recover automatically, when account creation reports
-     "already in use" we try signing in with the password just entered: if
-     it's the same password they used the first time (the common case, since
-     they don't know the first attempt half-succeeded), sign-in succeeds and
-     the caller can go on to (re)finish the linking step transparently. If
-     the password doesn't match, we mark the error so the caller can point
-     the person at "パスワードを忘れた方はこちら" instead of leaving them stuck. */
-  function beginAccount(email, password) {
-    return state.auth.createUserWithEmailAndPassword(email, password)
-      .then(function (cred) { return { cred: cred, created: true }; })
-      .catch(function (err) {
-        if (err && err.code === "auth/email-already-in-use") {
-          return state.auth.signInWithEmailAndPassword(email, password)
-            .then(function (cred) { return { cred: cred, created: false }; })
-            .catch(function (signInErr) {
-              signInErr.alreadyInUse = true;
-              throw signInErr;
-            });
-        }
-        throw err;
-      });
-  }
-  function myUnreadNoticeCount() {
-    if (state.role !== "instructor") return 0;
-    return state.notifications.filter(function (n) {
-      var forMe = !n.targetInstructorId || n.targetInstructorId === state.instructorId;
-      var read = Array.isArray(n.readBy) && n.readBy.indexOf(state.instructorId) !== -1;
-      return forMe && !read;
-    }).length;
-  }
+  window.location.href = url.toString();
+}
 
-  /* ============ utils ============ */
-  function esc(s) {
-    if (s === null || s === undefined) return "";
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
+function copyRoomLink() {
+  const feedback = document.getElementById("copyFeedback");
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    feedback.textContent = "コピーしました！";
+    setTimeout(() => { feedback.textContent = ""; }, 2500);
+  }).catch(() => {
+    feedback.textContent = window.location.href;
+  });
+}
+
+// ---- エラー表示(書き込みが失敗したときに気づけるようにする) ----
+function showAlert(message) {
+  const banner = document.getElementById("alertBanner");
+  const text = document.getElementById("alertBannerText");
+  text.textContent = message;
+  banner.style.display = "flex";
+}
+function hideAlert() {
+  document.getElementById("alertBanner").style.display = "none";
+}
+// Firebaseへの書き込みが失敗したときに共通で使うエラーハンドラ
+function onWriteError(err) {
+  console.error(err);
+  showAlert("操作がサーバーに反映できませんでした。通信が不安定な可能性があります。(" + (err && err.message ? err.message : err) + ")");
+}
+
+const colors = ["#3a6df0", "#f0973a", "#3ac97a", "#e14fd6", "#f0d23a", "#4fd6d6", "#f04f6f", "#8a5cf0"];
+
+// ローカルのキャッシュ(Firebaseから受け取った最新の状態)
+let timers = [];
+// 直前にアラームを鳴らした(=終了を検知した)タイマーidの記録。多重再生を防ぐため。
+const alarmedIds = new Set();
+
+function colorFor(id) {
+  let sum = 0;
+  for (let i = 0; i < id.length; i++) sum += id.charCodeAt(i);
+  return colors[sum % colors.length];
+}
+
+// 現在の残り時間(カウントダウン)・経過時間(ストップウォッチ)を計算する
+function computeCurrent(t) {
+  if (!t.running) return t.baseSeconds;
+  const elapsed = (Date.now() - t.baseTimestamp) / 1000;
+  if (t.type === "stopwatch") {
+    return t.baseSeconds + elapsed;
   }
-  function todayStr() {
-    var d = new Date();
-    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  return Math.max(0, t.baseSeconds - elapsed);
+}
+
+function formatTime(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  const m = Math.floor(sec / 60).toString().padStart(2, "0");
+  const s = Math.floor(sec % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+// 音を鳴らすためのAudioContextは1つだけ作って使い回す。
+// (鳴らすたびに新しく作ると、ブラウザの自動再生制限に引っかかって
+//  2つ目以降のタイマーの音が鳴らないことがあるため)
+let sharedAudioCtx = null;
+function getAudioContext() {
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  function pad(n) { return n < 10 ? "0" + n : "" + n; }
-  function thisMonthStr() { return todayStr().slice(0, 7); }
-  function formatDateJp(dateStr) {
-    if (!dateStr) return "";
-    var parts = dateStr.split("-");
-    if (parts.length !== 3) return dateStr;
-    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    var wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
-    return Number(parts[0]) + "年" + Number(parts[1]) + "月" + Number(parts[2]) + "日(" + wd + ")";
+  if (sharedAudioCtx.state === "suspended") {
+    sharedAudioCtx.resume();
   }
-  function formatDateShort(dateStr) {
-    if (!dateStr) return "";
-    var parts = dateStr.split("-");
-    if (parts.length !== 3) return dateStr;
-    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    var wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
-    return Number(parts[1]) + "/" + Number(parts[2]) + "(" + wd + ")";
-  }
-  function addMonths(monthStr, delta) {
-    var y = Number(monthStr.slice(0, 4)), m = Number(monthStr.slice(5, 7));
-    var d = new Date(y, m - 1 + delta, 1);
-    return d.getFullYear() + "-" + pad(d.getMonth() + 1);
-  }
-  function monthLabelJp(monthStr) {
-    return Number(monthStr.slice(0, 4)) + "年" + Number(monthStr.slice(5, 7)) + "月";
-  }
-  function yen(n) {
-    var v = Math.round(Number(n) || 0);
-    return "¥" + v.toLocaleString("ja-JP");
-  }
-  function timeRange(s, e) {
-    if (!s && !e) return "";
-    return (s || "?") + "〜" + (e || "?");
-  }
-  function toast(msg, isError) {
-    var stack = document.getElementById("toastStack");
-    if (!stack) return;
-    var el = document.createElement("div");
-    el.className = "toast" + (isError ? " error" : "");
-    el.textContent = msg;
-    stack.appendChild(el);
-    setTimeout(function () {
-      el.style.transition = "opacity .25s";
-      el.style.opacity = "0";
-      setTimeout(function () { el.remove(); }, 260);
-    }, 2600);
-  }
-  /* Artifacts run in a sandboxed frame where native confirm()/prompt() dialogs
-     are not reliable, so destructive actions use a same-button "press again
-     to confirm" pattern instead of window.confirm(). */
-  function armConfirm(btn, label) {
-    if (!btn.hasAttribute("data-original-label")) btn.setAttribute("data-original-label", btn.textContent);
-    btn.setAttribute("data-confirming", "1");
-    btn.textContent = label || "もう一度押すと削除します";
-    btn.classList.add("confirm-armed");
-    if (btn._armTimer) clearTimeout(btn._armTimer);
-    btn._armTimer = setTimeout(function () {
-      btn.removeAttribute("data-confirming");
-      btn.textContent = btn.getAttribute("data-original-label");
-      btn.classList.remove("confirm-armed");
-    }, 4000);
-  }
-  function onDangerClick(btn, label, action) {
-    if (btn.getAttribute("data-confirming") === "1") {
-      if (btn._armTimer) clearTimeout(btn._armTimer);
-      action();
-    } else {
-      armConfirm(btn, label);
+  return sharedAudioCtx;
+}
+// ページ内のどこかを最初にクリックした時点で音を鳴らす許可を得ておく
+document.addEventListener("click", function unlockAudioOnce() {
+  try { getAudioContext(); } catch (e) { /* audio not available */ }
+  document.removeEventListener("click", unlockAudioOnce);
+}, { once: true });
+
+function playAlarm() {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.3, now + i * 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.4 + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.4);
+      osc.stop(now + i * 0.4 + 0.3);
+    }
+  } catch (e) { /* audio not available */ }
+}
+
+// ---- 操作(すべてFirebaseに書き込み、全員の画面に反映される) ----
+function addTimer(name = "", minutes = 3, seconds = 0) {
+  const total = minutes * 60 + seconds;
+  const newRef = timersRef.push();
+  newRef.set({
+    type: "countdown",
+    name: name || `生徒`,
+    totalSeconds: total,
+    baseSeconds: total,
+    baseTimestamp: Date.now(),
+    running: false,
+    finished: false
+  }).then(hideAlert).catch(onWriteError);
+}
+
+function addStopwatch(name = "") {
+  const newRef = timersRef.push();
+  newRef.set({
+    type: "stopwatch",
+    name: name || `生徒`,
+    totalSeconds: 0,
+    baseSeconds: 0,
+    baseTimestamp: Date.now(),
+    running: false,
+    finished: false
+  }).then(hideAlert).catch(onWriteError);
+}
+
+function removeTimer(id) {
+  timersRef.child(id).remove().then(hideAlert).catch(onWriteError);
+}
+
+function startTimer(id) {
+  const t = timers.find(t => t.id === id);
+  if (!t || t.running) return;
+  const current = computeCurrent(t);
+  if (t.type === "countdown" && current <= 0) return;
+  timersRef.child(id).update({
+    baseSeconds: current,
+    baseTimestamp: Date.now(),
+    running: true,
+    finished: false
+  }).then(hideAlert).catch(onWriteError);
+}
+
+function pauseTimer(id) {
+  const t = timers.find(t => t.id === id);
+  if (!t) return;
+  const current = computeCurrent(t);
+  timersRef.child(id).update({
+    baseSeconds: current,
+    baseTimestamp: Date.now(),
+    running: false
+  }).then(hideAlert).catch(onWriteError);
+}
+
+function resetTimer(id) {
+  const t = timers.find(t => t.id === id);
+  if (!t) return;
+  const resetValue = t.type === "stopwatch" ? 0 : t.totalSeconds;
+  alarmedIds.delete(id);
+  timersRef.child(id).update({
+    baseSeconds: resetValue,
+    baseTimestamp: Date.now(),
+    running: false,
+    finished: false
+  }).then(hideAlert).catch(onWriteError);
+}
+
+function setTime(id, minutes, seconds) {
+  const t = timers.find(t => t.id === id);
+  if (!t || t.running) return;
+  const total = Math.max(0, minutes) * 60 + Math.max(0, Math.min(59, seconds));
+  timersRef.child(id).update({
+    totalSeconds: total,
+    baseSeconds: total,
+    baseTimestamp: Date.now(),
+    finished: false
+  }).then(hideAlert).catch(onWriteError);
+}
+
+function setName(id, name) {
+  timersRef.child(id).update({ name }).then(hideAlert).catch(onWriteError);
+}
+
+function startAll() { timers.forEach(t => startTimer(t.id)); }
+function pauseAll() { timers.forEach(t => pauseTimer(t.id)); }
+function resetAll() { timers.forEach(t => resetTimer(t.id)); }
+function removeAll() {
+  if (timers.length && !confirm("すべてのタイマーを削除しますか？(他の講師の画面からも消えます)")) return;
+  timersRef.remove().then(hideAlert).catch(onWriteError);
+}
+
+// ---- 描画 ----
+// 構造が変わったとき(追加・削除・名前変更など)だけ呼ばれる、カード全体の再構築
+function render() {
+  const container = document.getElementById("timers");
+  container.innerHTML = "";
+  timers.forEach(t => {
+    const current = computeCurrent(t);
+    const card = document.createElement("div");
+    card.id = `card-${t.id}`;
+    card.className = "card" + (t.finished ? " finished" : "");
+    card.style.setProperty("--card-color", t.color);
+
+    const min = Math.floor(t.totalSeconds / 60);
+    const sec = t.totalSeconds % 60;
+
+    const isStopwatch = t.type === "stopwatch";
+    const elapsed = isStopwatch ? current : (t.totalSeconds - current);
+
+    card.innerHTML = `
+      <span class="type-badge">${isStopwatch ? "⏱ ストップウォッチ" : "⏳ カウントダウン"}</span>
+      <div class="name-row">
+        <input class="name-input" value="${t.name.replace(/"/g, '&quot;')}" onchange="setName('${t.id}', this.value)" placeholder="生徒の名前">
+        <button class="remove-btn" onclick="removeTimer('${t.id}')">×</button>
+      </div>
+      <div class="time-display" id="time-${t.id}" style="color:${t.color}">${formatTime(current)}</div>
+      <div class="status-label" id="status-${t.id}">${t.finished ? "⏰ 終了！" : t.running ? formatTime(elapsed) : ""}</div>
+      ${!t.running && !isStopwatch ? `
+      <div class="set-row">
+        <input type="number" min="0" value="${min}" onchange="setTime('${t.id}', parseInt(this.value)||0, ${sec})"> <span>分</span>
+        <input type="number" min="0" max="59" value="${sec}" onchange="setTime('${t.id}', ${min}, parseInt(this.value)||0)"> <span>秒</span>
+      </div>
+      <div class="presets">
+        <button class="btn-secondary btn-small" onclick="setTime('${t.id}',3,0)">3分</button>
+        <button class="btn-secondary btn-small" onclick="setTime('${t.id}',5,0)">5分</button>
+        <button class="btn-secondary btn-small" onclick="setTime('${t.id}',7,0)">7分</button>
+      </div>
+      ` : ""}
+      <div class="controls">
+        ${t.running
+          ? `<button class="btn-secondary" onclick="pauseTimer('${t.id}')">一時停止</button>`
+          : `<button class="btn-primary" onclick="startTimer('${t.id}')">スタート</button>`}
+        <button class="btn-secondary" onclick="resetTimer('${t.id}')">リセット</button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// 毎秒呼ばれる軽量な更新(名前入力中のフォーカスを奪わないよう、数字表示だけを書き換える)
+function tick() {
+  timers.forEach(t => {
+    if (!t.running) return;
+    const current = computeCurrent(t);
+    const timeEl = document.getElementById(`time-${t.id}`);
+    const statusEl = document.getElementById(`status-${t.id}`);
+    const isStopwatch = t.type === "stopwatch";
+    const elapsed = isStopwatch ? current : (t.totalSeconds - current);
+    if (timeEl) timeEl.textContent = formatTime(current);
+    if (statusEl) statusEl.textContent = formatTime(elapsed);
+
+    if (t.type === "countdown" && current <= 0 && !alarmedIds.has(t.id)) {
+      alarmedIds.add(t.id);
+      playAlarm();
+      timersRef.child(t.id).update({
+        baseSeconds: 0,
+        baseTimestamp: Date.now(),
+        running: false,
+        finished: true
+      }).catch(onWriteError);
+    }
+  });
+}
+setInterval(tick, 1000);
+
+// ---- Firebaseの状態を購読(誰かが操作するたびに全員の画面が更新される) ----
+timersRef.on("value", (snapshot) => {
+  const val = snapshot.val() || {};
+  timers = Object.keys(val).map(id => ({
+    id,
+    color: colorFor(id),
+    ...val[id]
+  }));
+  render();
+});
+
+const statusEl = document.getElementById("syncStatus");
+let disconnectTimer = null;
+db.ref(".info/connected").on("value", (snap) => {
+  if (snap.val() === true) {
+    statusEl.textContent = "🟢 同期中";
+    if (disconnectTimer) {
+      clearTimeout(disconnectTimer);
+      disconnectTimer = null;
+    }
+    hideAlert();
+  } else {
+    statusEl.textContent = "🔴 接続待ち";
+    // 数秒待っても復帰しない場合だけ警告を出す(一瞬の再接続では表示しない)
+    if (!disconnectTimer) {
+      disconnectTimer = setTimeout(() => {
+        showAlert("サーバーとの接続が切れています。操作が反映されない場合はページを再読み込みしてください。");
+      }, 5000);
     }
   }
-  function byId(list, id) {
-    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
-    return null;
-  }
-  function instructorName(id) {
-    var it = byId(state.instructors, id);
-    return it ? it.name : "(不明な講師)";
-  }
-  function instructorRate(id) {
-    var it = byId(state.instructors, id);
-    return it ? Number(it.rate) || 0 : 0;
-  }
-  /* 承認済み実績のコマ数を合計する。month を指定するとその月のみ、
-     省略すると全期間の累計になる。 */
-  function instructorApprovedKoma(instructorId, month) {
-    return state.workReports.filter(function (r) {
-      return r.instructorId === instructorId && r.status === "approved" && (!month || String(r.date).slice(0, 7) === month);
-    }).reduce(function (a, r) { return a + Number(r.komaCount || 0); }, 0);
-  }
-  function sortByDateDesc(a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; }
-  function sortByDateAsc(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; }
-
-  /* ============ calendar component ============ */
-  var calState = {
-    instructor: { month: thisMonthStr(), selectedDate: todayStr() },
-    admin: { month: thisMonthStr(), selectedDate: todayStr() }
-  };
-
-  function groupShiftsByDate(list) {
-    var map = {};
-    list.forEach(function (s) { (map[s.date] = map[s.date] || []).push(s); });
-    return map;
-  }
-
-  function buildCalendarHtml(monthStr, dayShiftsMap, selectedDate, chipFn) {
-    var y = Number(monthStr.slice(0, 4)), m = Number(monthStr.slice(5, 7));
-    var startWeekday = new Date(y, m - 1, 1).getDay();
-    var daysInMonth = new Date(y, m, 0).getDate();
-    var weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
-    var head = weekdayLabels.map(function (w) { return '<div class="cal-weekday">' + w + "</div>"; }).join("");
-    var cells = [];
-    for (var i = 0; i < startWeekday; i++) cells.push('<div class="cal-cell cal-empty"></div>');
-    for (var d = 1; d <= daysInMonth; d++) {
-      var dateStr = y + "-" + pad(m) + "-" + pad(d);
-      var dayShifts = dayShiftsMap[dateStr] || [];
-      var hasMakeup = dayShifts.some(function (s) { return s.type === "makeup"; });
-      var cls = "cal-cell";
-      if (dateStr === todayStr()) cls += " cal-today";
-      if (dateStr === selectedDate) cls += " cal-selected";
-      if (dayShifts.length) cls += " cal-has" + (hasMakeup ? " cal-has-makeup" : "");
-      var chips = dayShifts.slice(0, 3).map(chipFn).join("");
-      var more = dayShifts.length > 3 ? '<div class="cal-more">+' + (dayShifts.length - 3) + "件</div>" : "";
-      cells.push('<button type="button" class="' + cls + '" data-cal-date="' + dateStr + '"><span class="cal-daynum">' + d + "</span>" + chips + more + "</button>");
-    }
-    return (
-      '<div class="cal-nav">' +
-        '<button type="button" class="cal-arrow" data-cal-prev aria-label="前の月">‹</button>' +
-        '<span class="cal-month-label">' + esc(monthLabelJp(monthStr)) + "</span>" +
-        '<button type="button" class="cal-arrow" data-cal-next aria-label="次の月">›</button>' +
-        '<button type="button" class="btn btn-outline btn-sm" data-cal-today>今日</button>' +
-      "</div>" +
-      '<div class="cal-head-row">' + head + "</div>" +
-      '<div class="cal-grid">' + cells.join("") + "</div>" +
-      '<div class="cal-legend"><span><span class="sw" style="background:var(--indigo);"></span>通常シフト</span><span><span class="sw" style="background:var(--vermillion);"></span>振替授業</span></div>'
-    );
-  }
-
-  function wireCalendarNav(containerEl, calKey, onChange) {
-    var cs = calState[calKey];
-    containerEl.querySelectorAll("[data-cal-date]").forEach(function (btn) {
-      btn.addEventListener("click", function () { cs.selectedDate = btn.getAttribute("data-cal-date"); onChange(); });
-    });
-    var prevBtn = containerEl.querySelector("[data-cal-prev]");
-    if (prevBtn) prevBtn.addEventListener("click", function () { cs.month = addMonths(cs.month, -1); onChange(); });
-    var nextBtn = containerEl.querySelector("[data-cal-next]");
-    if (nextBtn) nextBtn.addEventListener("click", function () { cs.month = addMonths(cs.month, 1); onChange(); });
-    var todayBtn = containerEl.querySelector("[data-cal-today]");
-    if (todayBtn) todayBtn.addEventListener("click", function () { cs.month = thisMonthStr(); cs.selectedDate = todayStr(); onChange(); });
-  }
-
-  function updateMyShiftsCalendar() {
-    var el = document.getElementById("myShiftsCalendar");
-    if (!el) return;
-    var cs = calState.instructor;
-    var mine = state.shifts.filter(function (s) { return s.instructorId === state.instructorId; });
-    var byDate = groupShiftsByDate(mine);
-    var calHtml = buildCalendarHtml(cs.month, byDate, cs.selectedDate, function (s) {
-      return '<div class="cal-chip' + (s.type === "makeup" ? " makeup" : "") + '">' + esc(timeRange(s.startTime, s.endTime)) + "</div>";
-    });
-    var dayList = (byDate[cs.selectedDate] || []).slice().sort(function (a, b) { return String(a.startTime || "").localeCompare(String(b.startTime || "")); });
-    var detailHtml = '<div class="cal-day-detail"><h3>' + esc(formatDateJp(cs.selectedDate)) + "</h3>" +
-      (dayList.length ? dayList.map(function (s) {
-        return '<div class="card" style="margin-bottom:8px;padding:12px 14px;">' +
-          '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;">' +
-            "<strong>" + esc(timeRange(s.startTime, s.endTime)) + "</strong>" +
-            (s.type === "makeup" ? '<span class="pill makeup"><span class="dot"></span>振替授業</span>' : '<span class="pill normal"><span class="dot"></span>通常</span>') +
-          "</div>" +
-          '<div class="num" style="margin-top:6px;">' + esc(s.komaCount) + "コマ</div>" +
-          (s.note ? '<div class="cell-note" style="margin-top:4px;">' + esc(s.note) + "</div>" : "") +
-        "</div>";
-      }).join("") : '<div class="empty-state">この日のシフトはありません</div>') +
-    "</div>";
-    el.innerHTML = calHtml + detailHtml;
-    wireCalendarNav(el, "instructor", updateMyShiftsCalendar);
-  }
-
-  function updateAdminShiftsCalendar() {
-    var el = document.getElementById("adminShiftsCalendar");
-    if (!el) return;
-    var cs = calState.admin;
-    var instFilterEl = document.getElementById("shiftFilterInstructor");
-    var instFilter = instFilterEl ? instFilterEl.value : "";
-    var list = state.shifts.slice();
-    if (instFilter) list = list.filter(function (s) { return s.instructorId === instFilter; });
-    var byDate = groupShiftsByDate(list);
-    var calHtml = buildCalendarHtml(cs.month, byDate, cs.selectedDate, function (s) {
-      return '<div class="cal-chip' + (s.type === "makeup" ? " makeup" : "") + '">' + esc((s.startTime || "") + " " + (s.instructorName || "")) + "</div>";
-    });
-    var dayList = (byDate[cs.selectedDate] || []).slice().sort(function (a, b) { return String(a.startTime || "").localeCompare(String(b.startTime || "")); });
-    var detailHtml = '<div class="cal-day-detail"><h3>' + esc(formatDateJp(cs.selectedDate)) + "</h3>" +
-      (dayList.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>講師</th><th>時間</th><th>コマ数</th><th>種別</th><th>備考</th><th></th></tr></thead><tbody>' +
-        dayList.map(function (s) {
-          return "<tr><td>" + esc(s.instructorName) + "</td><td>" + esc(timeRange(s.startTime, s.endTime)) + "</td><td class=\"num\">" + esc(s.komaCount) + "</td><td>" +
-            (s.type === "makeup" ? '<span class="pill makeup"><span class="dot"></span>振替</span>' : '<span class="pill normal"><span class="dot"></span>通常</span>') +
-            "</td><td class=\"cell-note\">" + esc(s.note || "—") + '</td><td class="row-actions">' +
-            (s.type === "makeup" ? "" : '<button type="button" class="btn btn-outline btn-sm" data-edit-shift="' + esc(s.id) + '">編集</button>') +
-            '<button type="button" class="btn btn-danger btn-sm" data-del-shift="' + esc(s.id) + '">削除</button>' +
-          "</td></tr>";
-        }).join("") + "</tbody></table></div>"
-        : '<div class="empty-state">この日のシフトはありません</div>') +
-      "</div>";
-    el.innerHTML = calHtml + detailHtml;
-    wireCalendarNav(el, "admin", updateAdminShiftsCalendar);
-    el.querySelectorAll("[data-edit-shift]").forEach(function (b) { b.addEventListener("click", function () { editShift(b.getAttribute("data-edit-shift")); }); });
-    el.querySelectorAll("[data-del-shift]").forEach(function (b) { b.addEventListener("click", function () { onDangerClick(b, "もう一度押すと削除", function () { deleteShift(b.getAttribute("data-del-shift")); }); }); });
-  }
-
-  /* ============ db / auth bootstrap ============
-     Sign-in state comes from Firebase Authentication (it persists its own
-     session; there is no localStorage bookkeeping to do here). Each
-     signed-in user is resolved to either the admin role (their uid is
-     listed in settings/roles.adminUids) or one instructor record (its
-     authUid field matches their uid) — see resolveIdentity(). */
-  var activeUnsubscribes = [];
-  var subscribedForUid; /* undefined = never subscribed yet */
-
-  function boot() {
-    if (!window.__firestoreDb || !window.__firebaseAuth) {
-      renderUnavailable();
-      return;
-    }
-    state.db = window.__firestoreDb;
-    state.auth = window.__firebaseAuth;
-    state.downloads = true; /* CSV export uses a plain browser download here, always available */
-    try {
-      state.auth.onAuthStateChanged(function (user) {
-        state.authUser = user || null;
-        state.authReady = true;
-        /* Firestoreの読み取りには「サインイン済みであること」が必要なルールに
-           なっているため、ページを開いた直後(サインイン状態がまだ確定していない
-           一瞬)に一度でも購読すると、その後サインインが確定しても同じ購読は
-           「権限なし」のまま自動では直らないことがある(Firestoreの仕様)。
-           そこで、サインイン中のユーザーが実際に変わった(未サインイン↔サインイン、
-           別の人に切り替わった、など)タイミングごとに、購読を一度すべて解除して
-           作り直す。これにより「ログインし直したのに一覧が空のまま」を防ぐ。 */
-        var uid = user ? user.uid : null;
-        if (uid !== subscribedForUid) {
-          subscribedForUid = uid;
-          activeUnsubscribes.forEach(function (unsub) { try { unsub(); } catch (e) {} });
-          activeUnsubscribes = [];
-          state.ready = { instructors: false, shiftCalls: false, availabilityResponses: false, shifts: false, workReports: false, notifications: false, roles: false };
-          subscribeAll();
-        }
-        onDataChange();
-      });
-    } catch (e) {
-      renderUnavailable();
-    }
-  }
-
-  function renderUnavailable() {
-    var root = document.getElementById("root");
-    root.innerHTML =
-      '<div class="gate">' +
-      '<h1 class="display" style="font-size:1.2rem;margin:0;">データ機能を利用できませんでした</h1>' +
-      '<p>リアルタイムのデータ保存機能に接続できませんでした。ネットワーク環境を確認の上、時間をおいて再度お試しください。それでも解決しない場合は管理者にご連絡ください。</p>' +
-      "</div>";
-  }
-
-  function subscribeAll() {
-    activeUnsubscribes.push(state.db.collection("instructors").onSnapshot(function (snap) {
-      state.instructors = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-      state.ready.instructors = true;
-      onDataChange();
-    }, function () { state.ready.instructors = true; onDataChange(); }));
-
-    activeUnsubscribes.push(state.db.collection("shiftCalls").onSnapshot(function (snap) {
-      state.shiftCalls = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-      state.ready.shiftCalls = true;
-      onDataChange();
-    }, function () { state.ready.shiftCalls = true; onDataChange(); }));
-
-    activeUnsubscribes.push(state.db.collection("availabilityResponses").onSnapshot(function (snap) {
-      state.availabilityResponses = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-      state.ready.availabilityResponses = true;
-      onDataChange();
-    }, function () { state.ready.availabilityResponses = true; onDataChange(); }));
-
-    activeUnsubscribes.push(state.db.collection("shifts").onSnapshot(function (snap) {
-      state.shifts = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-      state.ready.shifts = true;
-      onDataChange();
-    }, function () { state.ready.shifts = true; onDataChange(); }));
-
-    activeUnsubscribes.push(state.db.collection("workReports").onSnapshot(function (snap) {
-      state.workReports = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-      state.ready.workReports = true;
-      onDataChange();
-    }, function () { state.ready.workReports = true; onDataChange(); }));
-
-    activeUnsubscribes.push(state.db.collection("notifications").onSnapshot(function (snap) {
-      state.notifications = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
-      state.ready.notifications = true;
-      onDataChange();
-    }, function () { state.ready.notifications = true; onDataChange(); }));
-
-    activeUnsubscribes.push(state.db.doc("settings/roles").onSnapshot(function (snap) {
-      state.roles = snap.exists ? snap.data() : null;
-      state.ready.roles = true;
-      onDataChange();
-    }, function () { state.ready.roles = true; onDataChange(); }));
-
-    initVersionWatch();
-  }
-
-  /* ============ version / update banner ============
-     Lets a viewer who already has the page open find out, live, that
-     Claude has published a newer version — without silently reloading
-     out from under them mid-input. The first page to load a newer
-     APP_VERSION "announces" it into settings/appMeta; every other open
-     tab is subscribed to that doc and shows a reload prompt when its
-     own version is older. */
-  function initVersionWatch() {
-    var ref = state.db.doc("settings/appMeta");
-    activeUnsubscribes.push(ref.onSnapshot(function (snap) {
-      var d = snap.exists ? snap.data() : null;
-      var stored = d && d.version;
-      if (!stored) {
-        ref.set({ version: APP_VERSION, updatedAt: Date.now() }).catch(function () {});
-        return;
-      }
-      if (stored === APP_VERSION) return;
-      if (String(stored) > APP_VERSION) {
-        showVersionBanner();
-      } else {
-        ref.set({ version: APP_VERSION, updatedAt: Date.now() }).catch(function () {});
-      }
-    }, function () {}));
-  }
-
-  function showVersionBanner() {
-    var el = document.getElementById("versionBanner");
-    if (!el || el.classList.contains("show")) return;
-    el.classList.add("show");
-    el.innerHTML =
-      '<div class="version-banner-inner">' +
-        "<span>新しいバージョンが公開されました</span>" +
-        '<button type="button" class="btn btn-primary btn-sm" id="versionReloadBtn">今すぐ更新する</button>' +
-      "</div>";
-    document.getElementById("versionReloadBtn").addEventListener("click", function () { location.reload(); });
-  }
-
-  var appStarted = false;
-  var lastAuthUid = undefined; /* tracks which signed-in user we last resolved, so we only re-render the shell on an actual sign-in/sign-out transition */
-  function allReady() {
-    return state.ready.instructors && state.ready.shiftCalls && state.ready.availabilityResponses && state.ready.shifts && state.ready.workReports && state.ready.notifications && state.ready.roles && state.authReady;
-  }
-
-  /* Figures out state.role/instructorId/myName from the current Firebase
-     Auth user plus the instructors/roles data. Does not render anything —
-     callers decide whether the result changed enough to redraw. */
-  function resolveIdentity() {
-    if (!state.authUser) {
-      state.role = null; state.instructorId = null; state.myName = null;
-      lastAuthUid = null;
-      return;
-    }
-    var uid = state.authUser.uid;
-    if (isUidAdmin(uid)) {
-      state.role = "admin"; state.instructorId = null; state.myName = state.authUser.displayName || "管理者";
-      lastAuthUid = uid;
-      return;
-    }
-    var inst = state.instructors.filter(function (i) { return i.authUid === uid; })[0];
-    if (inst) {
-      state.role = "instructor"; state.instructorId = inst.id; state.myName = inst.name;
-      lastAuthUid = uid;
-      return;
-    }
-    /* Signed in, but not (yet) linked to an admin or instructor record.
-       This is expected for a moment right after self-registration, before
-       our own write lands back through the snapshot listener — so don't
-       sign the person out here, just don't show the app yet. */
-    state.role = null; state.instructorId = null; state.myName = null;
-  }
-
-  function onDataChange() {
-    if (!appStarted) {
-      if (!allReady()) return;
-      appStarted = true;
-      resolveIdentity();
-      if (state.role) { renderShell(); switchTab(state.role === "admin" ? ADMIN_TABS[0].id : INSTRUCTOR_TABS[0].id); }
-      else { renderLogin(); }
-      return;
-    }
-    var prevRole = state.role, prevInstructorId = state.instructorId;
-    resolveIdentity();
-    if (state.role !== prevRole || state.instructorId !== prevInstructorId) {
-      if (state.role) { renderShell(); switchTab(state.role === "admin" ? ADMIN_TABS[0].id : INSTRUCTOR_TABS[0].id); }
-      else { renderLogin(); }
-      return;
-    }
-    if (!state.role) { renderLogin(); return; }
-    refreshAll();
-  }
-
-  function logout() {
-    if (state.auth) state.auth.signOut();
-    state.role = null; state.instructorId = null; state.myName = null; state.activeTab = null;
-    lastAuthUid = null;
-    loginPin.instructorId = null; loginPin.error = "";
-    adminLogin.error = "";
-    renderLogin();
-  }
-
-  /* ============ login screen ============
-     Real accounts via Firebase Authentication (email + password). The
-     instructor side keeps the familiar "pick your name" first step —
-     once picked, we already know that instructor's email from their
-     Firestore record, so only a password field is shown. */
-  var loginPin = { instructorId: null, error: "" };
-  var adminLogin = { error: "" };
-
-  function renderLogin() {
-    var active = state.instructors.filter(function (i) { return i.active !== false; })
-      .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ja"); });
-
-    var pendingInst = loginPin.instructorId ? byId(state.instructors, loginPin.instructorId) : null;
-    if (loginPin.instructorId && !pendingInst) { loginPin.instructorId = null; loginPin.error = ""; }
-
-    var leftColHtml;
-    if (pendingInst) {
-      if (!pendingInst.email) {
-        leftColHtml =
-          '<div class="empty-note">「' + esc(pendingInst.name) + '」さんはまだメールアドレスが登録されていません。管理者に設定を依頼してください。</div>' +
-          '<button type="button" class="linklike" id="pinBackBtn">← 講師一覧に戻る</button>';
-      } else if (!pendingInst.authUid) {
-        leftColHtml =
-          '<form id="signupForm">' +
-            '<p style="margin:0 0 4px;font-weight:700;">' + esc(pendingInst.name) + " さん、はじめまして</p>" +
-            '<p class="hint" style="margin:0 0 12px;">初めてのご利用ですね。ログイン用のパスワードを決めてアカウントを作成してください。</p>' +
-            '<div class="field"><label for="pinNew">パスワード(6文字以上)</label><input type="password" id="pinNew" autocomplete="new-password" required minlength="6"></div>' +
-            '<div class="field"><label for="pinNew2">パスワード(確認)</label><input type="password" id="pinNew2" autocomplete="new-password" required minlength="6"></div>' +
-            (loginPin.error ? '<p style="color:var(--rose);font-size:.8rem;margin:-6px 0 12px;">' + esc(loginPin.error) + "</p>" : "") +
-            '<button type="submit" class="btn btn-primary btn-block">アカウントを作成してログイン</button>' +
-            '<button type="button" class="linklike" id="signupForgotBtn">すでにパスワードをお持ちの方・パスワードを忘れた方はこちら</button>' +
-            '<button type="button" class="linklike" id="pinBackBtn">← 講師一覧に戻る</button>' +
-          "</form>";
-      } else {
-        leftColHtml =
-          '<form id="pinForm">' +
-            '<p style="margin:0 0 12px;font-weight:700;">' + esc(pendingInst.name) + " さんとしてログイン</p>" +
-            '<div class="field"><label for="pinInput">パスワード</label><input type="password" id="pinInput" autocomplete="current-password" required></div>' +
-            (loginPin.error ? '<p style="color:var(--rose);font-size:.8rem;margin:-6px 0 12px;">' + esc(loginPin.error) + "</p>" : "") +
-            '<button type="submit" class="btn btn-primary btn-block">ログイン</button>' +
-            '<button type="button" class="linklike" id="pinForgotBtn">パスワードを忘れた方はこちら</button>' +
-            '<button type="button" class="linklike" id="pinBackBtn">← 講師一覧に戻る</button>' +
-          "</form>";
-      }
-    } else if (active.length === 0) {
-      leftColHtml = '<div class="empty-note">まだ講師が登録されていません。管理者としてログインし、「給与集計・講師管理」から講師を追加してください。</div>';
-    } else {
-      leftColHtml = '<div class="instructor-list">' + active.map(function (i) {
-        return '<button type="button" class="instructor-btn" data-instructor-id="' + esc(i.id) + '">' +
-          "<span>" + esc(i.name) + "</span><span class=\"arrow\">→</span></button>";
-      }).join("") + "</div>";
-    }
-
-    var rightColHtml;
-    if (!hasAnyAdmin()) {
-      rightColHtml =
-        '<p class="hint" style="margin:0 0 12px;">まだ管理者が登録されていません。最初にログインする方が、ここでアカウントを作成してください。</p>' +
-        '<form class="admin-login-form" id="adminSetupForm">' +
-          '<div class="field"><label for="adminNameInput">お名前(表示用)</label><input type="text" id="adminNameInput" placeholder="例: 教室長" maxlength="30"></div>' +
-          '<div class="field"><label for="adminEmailInput">メールアドレス</label><input type="email" id="adminEmailInput" autocomplete="email" required></div>' +
-          '<div class="field"><label for="adminPinNew">パスワード(6文字以上)</label><input type="password" id="adminPinNew" autocomplete="new-password" required minlength="6"></div>' +
-          '<div class="field"><label for="adminPinNew2">パスワード(確認)</label><input type="password" id="adminPinNew2" autocomplete="new-password" required minlength="6"></div>' +
-          (adminLogin.error ? '<p style="color:var(--rose);font-size:.8rem;margin:-6px 0 12px;">' + esc(adminLogin.error) + "</p>" : "") +
-          '<button type="submit" class="btn btn-primary btn-block">アカウントを作成してログイン</button>' +
-          '<button type="button" class="linklike" id="adminSetupForgotBtn">すでにパスワードをお持ちの方・パスワードを忘れた方はこちら</button>' +
-        "</form>";
-    } else {
-      rightColHtml =
-        '<form class="admin-login-form" id="adminLoginForm">' +
-          '<div class="field"><label for="adminEmailInput">メールアドレス</label><input type="email" id="adminEmailInput" autocomplete="email" required></div>' +
-          '<div class="field"><label for="adminPinInput">パスワード</label><input type="password" id="adminPinInput" autocomplete="current-password" required></div>' +
-          (adminLogin.error ? '<p style="color:var(--rose);font-size:.8rem;margin:-6px 0 12px;">' + esc(adminLogin.error) + "</p>" : "") +
-          '<button type="submit" class="btn btn-primary btn-block">管理者としてログイン</button>' +
-          '<button type="button" class="linklike" id="adminForgotBtn">パスワードを忘れた方はこちら</button>' +
-        "</form>";
-    }
-
-    document.getElementById("root").innerHTML =
-      '<div class="login-wrap"><div class="login-card">' +
-        '<div class="login-head">' +
-          '<div class="beads-row"><span></span><span></span><span></span><span></span><span></span></div>' +
-          "<h1>そろばんシフト帳</h1>" +
-          "<p>希望シフトの提出から出勤実績・給与の集計まで、講師と管理者でひとつにまとめます。</p>" +
-        "</div>" +
-        '<div class="login-body">' +
-          '<div class="login-col">' +
-            "<h2>講師の方はこちら</h2>" + leftColHtml +
-          "</div>" +
-          '<div class="login-col">' +
-            "<h2>管理者の方はこちら</h2>" + rightColHtml +
-          "</div>" +
-        "</div>" +
-      "</div></div>";
-
-    var list = document.querySelector(".instructor-list");
-    if (list) {
-      list.addEventListener("click", function (e) {
-        var btn = e.target.closest("[data-instructor-id]");
-        if (!btn) return;
-        var id = btn.getAttribute("data-instructor-id");
-        var inst = byId(state.instructors, id);
-        if (!inst) return;
-        loginPin.instructorId = id;
-        loginPin.error = "";
-        renderLogin();
-      });
-    }
-    var pinBackBtn = document.getElementById("pinBackBtn");
-    if (pinBackBtn) {
-      pinBackBtn.addEventListener("click", function () {
-        loginPin.instructorId = null; loginPin.error = "";
-        renderLogin();
-      });
-    }
-    var signupForm = document.getElementById("signupForm");
-    if (signupForm) {
-      signupForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var inst = byId(state.instructors, loginPin.instructorId);
-        if (!inst) { loginPin.instructorId = null; renderLogin(); return; }
-        var pin1 = document.getElementById("pinNew").value;
-        var pin2 = document.getElementById("pinNew2").value;
-        if (pin1 !== pin2) { loginPin.error = "確認用パスワードが一致しません。"; renderLogin(); return; }
-        var newUid = null;
-        beginAccount(inst.email, pin1)
-          .then(function (result) {
-            newUid = result.cred.user.uid;
-            if (result.created) return result.cred.user.updateProfile({ displayName: inst.name });
-          })
-          .then(function () {
-            return state.db.collection("instructors").doc(inst.id).update({ authUid: newUid });
-          })
-          .then(function () {
-            loginPin.instructorId = null; loginPin.error = "";
-            lastAuthUid = newUid;
-            state.role = "instructor"; state.instructorId = inst.id; state.myName = inst.name;
-            renderShell();
-            switchTab(INSTRUCTOR_TABS[0].id);
-          })
-          .catch(function (err) {
-            if (err && err.alreadyInUse) {
-              loginPin.error = "このメールアドレスはすでに登録されていますが、入力されたパスワードでは確認できませんでした。「すでにパスワードをお持ちの方はこちら」から再設定してください。";
-            } else {
-              loginPin.error = firebaseErrorMessage(err);
-            }
-            renderLogin();
-          });
-      });
-    }
-    var pinForm = document.getElementById("pinForm");
-    if (pinForm) {
-      pinForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var entered = document.getElementById("pinInput").value;
-        var inst = byId(state.instructors, loginPin.instructorId);
-        if (!inst) { loginPin.instructorId = null; renderLogin(); return; }
-        state.auth.signInWithEmailAndPassword(inst.email, entered).then(function (cred) {
-          loginPin.instructorId = null; loginPin.error = "";
-          lastAuthUid = cred.user.uid;
-          state.role = "instructor"; state.instructorId = inst.id; state.myName = inst.name;
-          renderShell();
-          switchTab(INSTRUCTOR_TABS[0].id);
-        }).catch(function (err) {
-          loginPin.error = firebaseErrorMessage(err);
-          renderLogin();
-        });
-      });
-    }
-    var signupForgotBtn = document.getElementById("signupForgotBtn");
-    if (signupForgotBtn) {
-      signupForgotBtn.addEventListener("click", function () {
-        var inst = byId(state.instructors, loginPin.instructorId);
-        if (!inst || !inst.email) return;
-        state.auth.sendPasswordResetEmail(inst.email).then(function () {
-          toast(inst.email + " 宛にパスワード再設定メールを送信しました");
-        }).catch(function (err) { toast(firebaseErrorMessage(err), true); });
-      });
-    }
-    var pinForgotBtn = document.getElementById("pinForgotBtn");
-    if (pinForgotBtn) {
-      pinForgotBtn.addEventListener("click", function () {
-        var inst = byId(state.instructors, loginPin.instructorId);
-        if (!inst || !inst.email) return;
-        state.auth.sendPasswordResetEmail(inst.email).then(function () {
-          toast(inst.email + " 宛にパスワード再設定メールを送信しました");
-        }).catch(function (err) { toast(firebaseErrorMessage(err), true); });
-      });
-    }
-    var adminSetupForm = document.getElementById("adminSetupForm");
-    if (adminSetupForm) {
-      adminSetupForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var name = document.getElementById("adminNameInput").value.trim() || "管理者";
-        var email = document.getElementById("adminEmailInput").value.trim();
-        var pin1 = document.getElementById("adminPinNew").value;
-        var pin2 = document.getElementById("adminPinNew2").value;
-        if (pin1 !== pin2) { adminLogin.error = "確認用パスワードが一致しません。"; renderLogin(); return; }
-        var newUid = null;
-        beginAccount(email, pin1)
-          .then(function (result) {
-            newUid = result.cred.user.uid;
-            if (result.created) return result.cred.user.updateProfile({ displayName: name });
-          })
-          .then(function () {
-            return state.db.doc("settings/roles").set({ adminUids: [newUid], updatedAt: Date.now() });
-          })
-          .then(function () {
-            lastAuthUid = newUid;
-            state.role = "admin"; state.instructorId = null; state.myName = name;
-            renderShell();
-            switchTab(ADMIN_TABS[0].id);
-          })
-          .catch(function (err) {
-            if (err && err.alreadyInUse) {
-              adminLogin.error = "このメールアドレスはすでに登録されていますが、入力されたパスワードでは確認できませんでした。「すでにパスワードをお持ちの方はこちら」から再設定してください。";
-            } else {
-              adminLogin.error = firebaseErrorMessage(err);
-            }
-            renderLogin();
-          });
-      });
-    }
-    var adminSetupForgotBtn = document.getElementById("adminSetupForgotBtn");
-    if (adminSetupForgotBtn) {
-      adminSetupForgotBtn.addEventListener("click", function () {
-        var emailEl = document.getElementById("adminEmailInput");
-        var email2 = emailEl ? emailEl.value.trim() : "";
-        if (!email2) { adminLogin.error = "メールアドレスを入力してから押してください。"; renderLogin(); return; }
-        state.auth.sendPasswordResetEmail(email2).then(function () {
-          toast(email2 + " 宛にパスワード再設定メールを送信しました");
-        }).catch(function (err) { toast(firebaseErrorMessage(err), true); });
-      });
-    }
-    var adminLoginForm = document.getElementById("adminLoginForm");
-    if (adminLoginForm) {
-      adminLoginForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var email = document.getElementById("adminEmailInput").value.trim();
-        var entered = document.getElementById("adminPinInput").value;
-        state.auth.signInWithEmailAndPassword(email, entered).then(function (cred) {
-          adminLogin.error = "";
-          lastAuthUid = cred.user.uid;
-          state.role = "admin"; state.instructorId = null; state.myName = cred.user.displayName || "管理者";
-          renderShell();
-          switchTab(ADMIN_TABS[0].id);
-        }).catch(function (err) {
-          adminLogin.error = firebaseErrorMessage(err);
-          renderLogin();
-        });
-      });
-    }
-    var adminForgotBtn = document.getElementById("adminForgotBtn");
-    if (adminForgotBtn) {
-      adminForgotBtn.addEventListener("click", function () {
-        var emailEl = document.getElementById("adminEmailInput");
-        var email = emailEl ? emailEl.value.trim() : "";
-        if (!email) { adminLogin.error = "メールアドレスを入力してから押してください。"; renderLogin(); return; }
-        state.auth.sendPasswordResetEmail(email).then(function () {
-          toast(email + " 宛にパスワード再設定メールを送信しました");
-        }).catch(function (err) { toast(firebaseErrorMessage(err), true); });
-      });
-    }
-  }
-
-  /* ============ app shell ============ */
-  function renderShell() {
-    var tabs = state.role === "admin" ? ADMIN_TABS : INSTRUCTOR_TABS;
-    document.getElementById("root").innerHTML =
-      '<div class="shell">' +
-        '<div class="mobile-topbar">' +
-          '<button type="button" class="hamburger-btn" id="menuOpenBtn" aria-label="メニューを開く"><span class="bars"></span><span class="mb-dot" id="noticesBadgeMobile" hidden></span></button>' +
-          '<div class="brand"><div class="beads-row"><span></span><span></span><span></span></div><span class="word">そろばんシフト帳</span></div>' +
-          '<span style="width:40px;"></span>' +
-        "</div>" +
-        '<div class="sidebar-overlay" id="sidebarOverlay"></div>' +
-        '<div class="sidebar" id="sidebarEl">' +
-          '<button type="button" class="sidebar-close" id="menuCloseBtn" aria-label="メニューを閉じる">✕</button>' +
-          '<div class="brand"><div class="beads-row"><span></span><span></span><span></span></div><span class="word">そろばんシフト帳</span></div>' +
-          '<div class="identity-card">' +
-            '<div class="name">' + esc(state.myName) + "</div>" +
-            '<span class="role-pill ' + (state.role === "admin" ? "admin" : "instructor") + '">' +
-              (state.role === "admin" ? "管理者" : "講師") + "</span>" +
-            '<button type="button" class="btn btn-outline btn-sm btn-block" id="logoutBtn">ログアウト / 切り替え</button>' +
-          "</div>" +
-          '<nav class="nav" id="navList">' +
-            tabs.map(function (t) {
-              var badge = (t.id === "notices" && state.role === "instructor") ? '<span class="nav-badge" id="noticesBadge" hidden></span>' : "";
-              return '<button type="button" data-tab="' + t.id + '"><span class="dot"></span><span class="label">' + esc(t.label) + "</span>" + badge + "</button>";
-            }).join("") +
-          "</nav>" +
-          '<div class="sidebar-foot">そろばんシフト帳 &middot; プロトタイプ</div>' +
-        "</div>" +
-        '<div class="main" id="mainArea"></div>' +
-      "</div>";
-    document.getElementById("logoutBtn").addEventListener("click", logout);
-    document.getElementById("navList").addEventListener("click", function (e) {
-      var btn = e.target.closest("[data-tab]");
-      if (!btn) return;
-      switchTab(btn.getAttribute("data-tab"));
-      closeMobileMenu();
-    });
-    var sidebarEl = document.getElementById("sidebarEl");
-    var overlayEl = document.getElementById("sidebarOverlay");
-    function openMobileMenu() { sidebarEl.classList.add("open"); overlayEl.classList.add("open"); }
-    document.getElementById("menuOpenBtn").addEventListener("click", openMobileMenu);
-    document.getElementById("menuCloseBtn").addEventListener("click", closeMobileMenu);
-    overlayEl.addEventListener("click", closeMobileMenu);
-  }
-
-  function closeMobileMenu() {
-    var sidebarEl = document.getElementById("sidebarEl");
-    var overlayEl = document.getElementById("sidebarOverlay");
-    if (sidebarEl) sidebarEl.classList.remove("open");
-    if (overlayEl) overlayEl.classList.remove("open");
-  }
-
-  function markActiveNav() {
-    var btns = document.querySelectorAll("#navList [data-tab]");
-    btns.forEach(function (b) {
-      b.classList.toggle("active", b.getAttribute("data-tab") === state.activeTab);
-    });
-  }
-
-  function switchTab(tabId) {
-    state.activeTab = tabId;
-    markActiveNav();
-    var main = document.getElementById("mainArea");
-    if (!main) return;
-    if (state.role === "admin") {
-      renderAdminTab(tabId, main);
-    } else {
-      renderInstructorTab(tabId, main);
-    }
-    refreshAll();
-  }
-
-  function refreshAll() {
-    if (!state.role) return;
-    markActiveNav();
-    updateNavBadge();
-    updateUnreadBanner();
-    updateAvailList();
-    updateMyShiftsList();
-    updateMyShiftsCalendar();
-    updateMyReportsList();
-    updateSummary();
-    updateNoticesList();
-    updateAdminCallsList();
-    updateAdminShiftsList();
-    updateAdminShiftsCalendar();
-    updateMakeupList();
-    updateApprovalsList();
-    updateAdminNoticesList();
-    updateInstructorAdminList();
-    updatePayrollTable();
-  }
-
-  /* =====================================================================
-     INSTRUCTOR VIEW
-     ===================================================================== */
-  function renderInstructorTab(tabId, main) {
-    if (tabId === "avail") {
-      main.innerHTML =
-        '<div class="page-head"><h1>シフト回答</h1><p>管理者が指定した日時ごとに、出勤できるかどうかを回答してください。回答はいつでも変更できます。</p></div>' +
-        '<div id="unreadBanner"></div>' +
-        '<div class="card"><div id="list-availCalls"></div></div>';
-    }
-
-    if (tabId === "myshifts") {
-      main.innerHTML =
-        '<div class="page-head"><h1>確定シフト一覧</h1><p>管理者が確定したシフトです。振替授業もここに含まれます。日付をタップすると詳細が見られます。</p></div>' +
-        '<div id="unreadBanner"></div>' +
-        '<div class="card"><div id="myShiftsCalendar"></div></div>' +
-        '<div class="card"><div id="list-myShifts"></div></div>';
-    }
-
-    if (tabId === "report") {
-      main.innerHTML =
-        '<div class="page-head"><h1>実績提出</h1><p>勤務した日のコマ数を自己申告してください。管理者の承認後、給与集計に反映されます。</p></div>' +
-        '<div id="unreadBanner"></div>' +
-        '<div class="two-col">' +
-          '<div class="card">' +
-            "<h2>実績を提出する</h2>" +
-            '<form id="workReportForm">' +
-              '<div class="field"><label for="wrDate">勤務日</label><input type="date" id="wrDate" required value="' + esc(todayStr()) + '"></div>' +
-              '<div class="field"><label for="wrShift">対応する確定シフト(任意)</label><select id="wrShift"><option value="">選択しない</option></select></div>' +
-              '<div class="field"><label for="wrKoma">実績コマ数</label><input type="number" id="wrKoma" min="1" step="1" required placeholder="例: 4"></div>' +
-              '<div class="field"><label for="wrNote">備考(任意)</label><textarea id="wrNote" placeholder="例: 振替1コマ含む"></textarea></div>' +
-              '<button type="submit" class="btn btn-primary btn-block">実績を提出する</button>' +
-            "</form>" +
-          "</div>" +
-          '<div class="card">' +
-            "<h2>提出履歴</h2><p class=\"card-sub\">承認状況を確認できます</p>" +
-            '<div id="list-myReports"></div>' +
-          "</div>" +
-        "</div>";
-      document.getElementById("workReportForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        var koma = Number(document.getElementById("wrKoma").value);
-        var date = document.getElementById("wrDate").value;
-        if (!date || !koma || koma < 1) { toast("勤務日とコマ数を入力してください", true); return; }
-        var body = {
-          instructorId: state.instructorId,
-          instructorName: state.myName,
-          date: date,
-          shiftId: document.getElementById("wrShift").value || null,
-          komaCount: koma,
-          note: document.getElementById("wrNote").value.trim(),
-          status: "pending",
-          adminNote: "",
-          submittedAt: Date.now()
-        };
-        state.db.collection("workReports").add(body).then(function () {
-          toast("実績を提出しました。承認をお待ちください。");
-          e.target.reset();
-          document.getElementById("wrDate").value = todayStr();
-        }).catch(function () { toast("送信に失敗しました。もう一度お試しください。", true); });
-      });
-      populateMyShiftSelect();
-    }
-
-    if (tabId === "summary") {
-      main.innerHTML =
-        '<div class="page-head"><h1>実績・給与目安</h1><p>承認済みの実績コマ数から給与の目安を計算します(あくまで目安です)。</p></div>' +
-        '<div id="unreadBanner"></div>' +
-        '<div id="summaryContent"></div>';
-    }
-
-    if (tabId === "notices") {
-      main.innerHTML =
-        '<div class="page-head"><h1>お知らせ</h1><p>管理者からのお知らせです。</p></div>' +
-        '<div class="card"><div id="list-notices"></div></div>';
-    }
-  }
-
-  function populateMyShiftSelect() {
-    var sel = document.getElementById("wrShift");
-    if (!sel) return;
-    var mine = state.shifts.filter(function (s) { return s.instructorId === state.instructorId; }).sort(sortByDateDesc).slice(0, 40);
-    var cur = sel.value;
-    sel.innerHTML = '<option value="">選択しない</option>' + mine.map(function (s) {
-      return '<option value="' + esc(s.id) + '">' + esc(formatDateShort(s.date)) + " " + esc(timeRange(s.startTime, s.endTime)) + " ・" + esc(s.komaCount) + "コマ" + (s.type === "makeup" ? "(振替)" : "") + "</option>";
-    }).join("");
-    if (cur && mine.some(function (s) { return s.id === cur; })) sel.value = cur;
-  }
-
-  function updateAvailList() {
-    var el = document.getElementById("list-availCalls");
-    if (!el) return;
-    var calls = state.shiftCalls.slice().sort(sortByDateAsc);
-    if (calls.length === 0) { el.innerHTML = '<div class="empty-state">まだ管理者からのシフト募集はありません</div>'; return; }
-    var respByCall = {};
-    state.availabilityResponses.forEach(function (r) {
-      if (r.instructorId === state.instructorId) respByCall[r.callId] = r;
-    });
-    el.innerHTML = calls.map(function (c) {
-      var resp = respByCall[c.id];
-      var ans = resp ? resp.answer : null;
-      var deadlineNote = "";
-      if (c.deadline) {
-        var isOverdue = c.deadline < todayStr() && !ans;
-        deadlineNote = '<div class="cell-note" style="margin-bottom:8px;' + (isOverdue ? "color:var(--vermillion);" : "") + '">回答締切: ' + esc(formatDateJp(c.deadline)) + (isOverdue ? "(締切を過ぎています。お早めにご回答ください)" : "") + "</div>";
-      }
-      return '<div class="card" style="margin-bottom:12px;">' +
-        '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">' +
-          "<div><strong>" + esc(formatDateJp(c.date)) + '</strong><span class="cell-note" style="margin-left:8px;">' + esc(timeRange(c.startTime, c.endTime)) + "</span></div>" +
-          (ans === "available" ? '<span class="pill approved"><span class="dot"></span>出勤可能で回答済み</span>' :
-            ans === "unavailable" ? '<span class="pill off"><span class="dot"></span>休み希望で回答済み</span>' :
-            '<span class="pill pending"><span class="dot"></span>未回答</span>') +
-        "</div>" +
-        deadlineNote +
-        (c.note ? '<div class="cell-note" style="margin-bottom:10px;">' + esc(c.note) + "</div>" : "") +
-        '<div class="radio-group" data-answer-group="' + esc(c.id) + '">' +
-          '<label class="radio-chip' + (ans === "available" ? " checked" : "") + '"><input type="radio" name="ans-' + esc(c.id) + '" value="available"' + (ans === "available" ? " checked" : "") + ">出勤可能</label>" +
-          '<label class="radio-chip' + (ans === "unavailable" ? " checked" : "") + '"><input type="radio" name="ans-' + esc(c.id) + '" value="unavailable"' + (ans === "unavailable" ? " checked" : "") + ">休み希望</label>" +
-        "</div>" +
-        '<textarea class="answer-note" data-note-for="' + esc(c.id) + '" placeholder="備考(任意)" style="margin-top:8px;">' + esc(resp && resp.note ? resp.note : "") + "</textarea>" +
-        '<button type="button" class="btn btn-primary btn-sm" style="margin-top:8px;" data-save-answer="' + esc(c.id) + '">回答を保存する</button>' +
-      "</div>";
-    }).join("");
-
-    el.querySelectorAll("[data-answer-group]").forEach(function (group) {
-      group.addEventListener("change", function () {
-        group.querySelectorAll(".radio-chip").forEach(function (c) { c.classList.toggle("checked", c.querySelector("input").checked); });
-      });
-    });
-    el.querySelectorAll("[data-save-answer]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var callId = btn.getAttribute("data-save-answer");
-        var call = byId(state.shiftCalls, callId);
-        var group = el.querySelector('[data-answer-group="' + callId + '"]');
-        var checked = group ? group.querySelector("input:checked") : null;
-        if (!checked) { toast("出勤可能か休み希望を選んでください", true); return; }
-        var noteEl = el.querySelector('[data-note-for="' + callId + '"]');
-        var docId = callId + "__" + state.instructorId;
-        state.db.collection("availabilityResponses").doc(docId).set({
-          callId: callId,
-          instructorId: state.instructorId,
-          instructorName: state.myName,
-          date: call ? call.date : "",
-          answer: checked.value,
-          note: noteEl ? noteEl.value.trim() : "",
-          respondedAt: Date.now()
-        }).then(function () { toast("回答を保存しました"); }).catch(function () { toast("保存に失敗しました。もう一度お試しください。", true); });
-      });
-    });
-  }
-
-  function markMyNoticesRead() {
-    if (state.role !== "instructor") return;
-    var unread = state.notifications.filter(function (n) {
-      var forMe = !n.targetInstructorId || n.targetInstructorId === state.instructorId;
-      var read = Array.isArray(n.readBy) && n.readBy.indexOf(state.instructorId) !== -1;
-      return forMe && !read;
-    });
-    unread.forEach(function (n) {
-      var readBy = Array.isArray(n.readBy) ? n.readBy.slice() : [];
-      readBy.push(state.instructorId);
-      state.db.collection("notifications").doc(n.id).update({ readBy: readBy }).catch(function () {});
-    });
-  }
-
-  function updateNoticesList() {
-    var el = document.getElementById("list-notices");
-    if (!el) return;
-    markMyNoticesRead();
-    var mine = state.notifications.filter(function (n) { return !n.targetInstructorId || n.targetInstructorId === state.instructorId; })
-      .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-    if (mine.length === 0) { el.innerHTML = '<div class="empty-state">お知らせはまだありません</div>'; return; }
-    el.innerHTML = mine.map(function (n) {
-      var read = Array.isArray(n.readBy) && n.readBy.indexOf(state.instructorId) !== -1;
-      var when = n.createdAt ? new Date(n.createdAt).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-      return '<div class="notice-card' + (read ? "" : " unread") + '">' +
-        '<div class="notice-title">' + esc(n.title) + "</div>" +
-        '<div class="notice-meta">' + esc(when) + "</div>" +
-        '<div class="notice-body">' + esc(n.body) + "</div>" +
-      "</div>";
-    }).join("");
-  }
-
-  function updateUnreadBanner() {
-    var el = document.getElementById("unreadBanner");
-    if (!el) return;
-    var n = myUnreadNoticeCount();
-    el.innerHTML = n > 0 ? '<div class="notice-banner"><span>お知らせが' + n + '件届いています</span><button type="button" class="btn btn-primary btn-sm" id="goNoticesBtn">確認する</button></div>' : "";
-    var btn = document.getElementById("goNoticesBtn");
-    if (btn) btn.addEventListener("click", function () { switchTab("notices"); });
-  }
-
-  function updateNavBadge() {
-    var n = myUnreadNoticeCount();
-    var el = document.getElementById("noticesBadge");
-    if (el) { if (n > 0) { el.textContent = n; el.hidden = false; } else { el.hidden = true; } }
-    var mb = document.getElementById("noticesBadgeMobile");
-    if (mb) mb.hidden = n <= 0;
-  }
-
-  function updateMyShiftsList() {
-    var el = document.getElementById("list-myShifts");
-    if (!el) return;
-    var mine = state.shifts.filter(function (s) { return s.instructorId === state.instructorId; }).sort(sortByDateAsc);
-    var today = todayStr();
-    var upcoming = mine.filter(function (s) { return s.date >= today; });
-    var past = mine.filter(function (s) { return s.date < today; }).sort(sortByDateDesc);
-    function rows(list) {
-      return list.map(function (s) {
-        return "<tr><td>" + esc(formatDateJp(s.date)) + "</td><td>" + esc(timeRange(s.startTime, s.endTime)) + "</td><td class=\"num\">" + esc(s.komaCount) + "コマ</td><td>" +
-          (s.type === "makeup" ? '<span class="pill makeup"><span class="dot"></span>振替授業</span>' : '<span class="pill normal"><span class="dot"></span>通常</span>') +
-          "</td><td class=\"cell-note\">" + esc(s.note || "—") + "</td></tr>";
-      }).join("");
-    }
-    var html = "";
-    html += "<h2 style=\"font-size:.95rem;margin:0 0 10px;\">今後のシフト(" + upcoming.length + "件)</h2>";
-    html += upcoming.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>日付</th><th>時間</th><th>コマ数</th><th>種別</th><th>備考</th></tr></thead><tbody>' + rows(upcoming) + "</tbody></table></div>" : '<div class="empty-state">今後確定しているシフトはありません</div>';
-    html += '<div class="divider"></div>';
-    html += "<h2 style=\"font-size:.95rem;margin:0 0 10px;\">過去のシフト</h2>";
-    html += past.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>日付</th><th>時間</th><th>コマ数</th><th>種別</th><th>備考</th></tr></thead><tbody>' + rows(past.slice(0, 30)) + "</tbody></table></div>" : '<div class="empty-state">過去のシフト履歴はありません</div>';
-    el.innerHTML = html;
-    populateMyShiftSelect();
-  }
-
-  function updateMyReportsList() {
-    var el = document.getElementById("list-myReports");
-    if (!el) return;
-    var mine = state.workReports.filter(function (r) { return r.instructorId === state.instructorId; }).sort(sortByDateDesc);
-    if (mine.length === 0) { el.innerHTML = '<div class="empty-state">まだ提出した実績はありません</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>勤務日</th><th>コマ数</th><th>備考</th><th>状況</th></tr></thead><tbody>' +
-      mine.map(function (r) {
-        var pill = r.status === "approved" ? '<span class="pill approved"><span class="dot"></span>承認済み</span>' :
-          r.status === "rejected" ? '<span class="pill rejected"><span class="dot"></span>差し戻し' + (r.adminNote ? "：" + esc(r.adminNote) : "") + "</span>" :
-          '<span class="pill pending"><span class="dot"></span>承認待ち</span>';
-        return "<tr><td>" + esc(formatDateShort(r.date)) + "</td><td class=\"num\">" + esc(r.komaCount) + "コマ</td><td class=\"cell-note\">" + esc(r.note || "—") + "</td><td>" + pill + "</td></tr>";
-      }).join("") + "</tbody></table></div>";
-  }
-
-  function updateSummary() {
-    var el = document.getElementById("summaryContent");
-    if (!el) return;
-    var mine = state.workReports.filter(function (r) { return r.instructorId === state.instructorId && r.status === "approved"; });
-    var rate = instructorRate(state.instructorId);
-    var month = thisMonthStr();
-    var thisMonth = mine.filter(function (r) { return r.date.slice(0, 7) === month; });
-    var komaMonth = thisMonth.reduce(function (a, r) { return a + Number(r.komaCount || 0); }, 0);
-    var komaAll = mine.reduce(function (a, r) { return a + Number(r.komaCount || 0); }, 0);
-    var pendingCount = state.workReports.filter(function (r) { return r.instructorId === state.instructorId && r.status === "pending"; }).length;
-    el.innerHTML =
-      '<div class="stat-grid">' +
-        '<div class="stat-card"><div class="label">今月の承認済みコマ数</div><div class="value num">' + komaMonth + '<span class="unit">コマ</span></div></div>' +
-        '<div class="stat-card"><div class="label">今月の給与目安</div><div class="value num">' + yen(komaMonth * rate) + "</div></div>" +
-        '<div class="stat-card"><div class="label">累計の承認済みコマ数</div><div class="value num">' + komaAll + '<span class="unit">コマ</span></div></div>' +
-        '<div class="stat-card"><div class="label">承認待ちの提出</div><div class="value num">' + pendingCount + '<span class="unit">件</span></div></div>' +
-      "</div>" +
-      '<p class="hint">単価: ' + yen(rate) + " / コマ(管理者が設定)。給与目安は承認済みの実績のみで計算しています。</p>";
-  }
-
-  /* =====================================================================
-     ADMIN VIEW
-     ===================================================================== */
-  var pendingShiftPrefill = null;
-  function goCreateShiftFromResponse(call, instructorId) {
-    pendingShiftPrefill = { date: call.date, startTime: call.startTime, endTime: call.endTime, instructorId: instructorId };
-    switchTab("shifts");
-  }
-
-  function renderAdminTab(tabId, main) {
-    if (tabId === "calls") {
-      main.innerHTML =
-        '<div class="page-head"><h1>シフト募集・回答確認</h1><p>日時を指定して講師に出勤可否を回答してもらいます。回答が集まったら「シフト一覧・作成」で確定シフトにしてください。</p></div>' +
-        '<div class="two-col">' +
-          '<div class="card">' +
-            "<h2>シフト募集を追加する</h2>" +
-            '<form id="callForm">' +
-              '<div class="field"><label for="callDate">日付</label><input type="date" id="callDate" required value="' + esc(todayStr()) + '"></div>' +
-              '<div class="field-row"><div class="field"><label for="callStart">開始</label><input type="time" id="callStart" value="10:00"></div><div class="field"><label for="callEnd">終了</label><input type="time" id="callEnd" value="18:00"></div></div>' +
-              '<div class="field"><label for="callDeadline">回答締切日(任意)</label><input type="date" id="callDeadline"></div>' +
-              '<div class="field"><label for="callNote">備考(任意)</label><textarea id="callNote" placeholder="例: 夏期講習の追加コマ"></textarea></div>' +
-              '<button type="submit" class="btn btn-primary btn-block">この日時で募集する</button>' +
-            "</form>" +
-          "</div>" +
-          '<div class="card">' +
-            '<div id="list-adminCalls"></div>' +
-          "</div>" +
-        "</div>";
-      document.getElementById("callForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        var date = document.getElementById("callDate").value;
-        if (!date) { toast("日付を選んでください", true); return; }
-        var deadline = document.getElementById("callDeadline").value || null;
-        if (deadline && deadline > date) { toast("回答締切日はシフトの日付より前にしてください", true); return; }
-        var body = {
-          date: date,
-          startTime: document.getElementById("callStart").value,
-          endTime: document.getElementById("callEnd").value,
-          deadline: deadline,
-          note: document.getElementById("callNote").value.trim(),
-          createdAt: Date.now(),
-          createdBy: state.myName
-        };
-        state.db.collection("shiftCalls").add(body).then(function () {
-          toast("シフト募集を追加しました");
-          e.target.reset();
-          document.getElementById("callDate").value = todayStr();
-        }).catch(function () { toast("追加に失敗しました。もう一度お試しください。", true); });
-      });
-    }
-
-    if (tabId === "shifts") {
-      main.innerHTML =
-        '<div class="page-head"><h1>シフト一覧・作成</h1><p>確定シフトを作成・編集します。振替授業の追加は専用タブから行えます。</p></div>' +
-        '<div class="card"><div id="adminShiftsCalendar"></div></div>' +
-        '<div class="two-col">' +
-          '<div class="card">' +
-            '<h2 id="shiftFormTitle">シフトを作成する</h2>' +
-            '<form id="shiftForm">' +
-              '<div class="field"><label for="sfInstructor">講師</label><select id="sfInstructor" required></select></div>' +
-              '<div class="field"><label for="sfDate">日付</label><input type="date" id="sfDate" required value="' + esc(todayStr()) + '"></div>' +
-              '<div class="field-row"><div class="field"><label for="sfStart">開始</label><input type="time" id="sfStart" value="10:00"></div><div class="field"><label for="sfEnd">終了</label><input type="time" id="sfEnd" value="18:00"></div></div>' +
-              '<div class="field"><label for="sfKoma">コマ数</label><input type="number" id="sfKoma" min="1" step="1" required placeholder="例: 4"></div>' +
-              '<div class="field"><label for="sfNote">備考(任意)</label><textarea id="sfNote"></textarea></div>' +
-              '<div style="display:flex;gap:8px;">' +
-                '<button type="submit" class="btn btn-primary" style="flex:1;" id="shiftFormSubmit">シフトを作成する</button>' +
-                '<button type="button" class="btn btn-outline" id="shiftFormCancel" hidden>編集をやめる</button>' +
-              "</div>" +
-            "</form>" +
-          "</div>" +
-          '<div class="card">' +
-            '<div class="toolbar" style="margin-bottom:12px;"><div class="field"><label for="shiftFilterInstructor">講師で絞り込み</label><select id="shiftFilterInstructor"><option value="">すべての講師</option></select></div><div class="field"><label for="shiftFilterRange">期間</label><select id="shiftFilterRange"><option value="upcoming">今日以降</option><option value="all">すべて</option></select></div></div>' +
-            '<div id="list-adminShifts"></div>' +
-          "</div>" +
-        "</div>";
-      populateInstructorSelect("sfInstructor");
-      populateInstructorSelect("shiftFilterInstructor", true);
-      if (pendingShiftPrefill) {
-        document.getElementById("sfDate").value = pendingShiftPrefill.date || todayStr();
-        if (pendingShiftPrefill.startTime) document.getElementById("sfStart").value = pendingShiftPrefill.startTime;
-        if (pendingShiftPrefill.endTime) document.getElementById("sfEnd").value = pendingShiftPrefill.endTime;
-        if (pendingShiftPrefill.instructorId) document.getElementById("sfInstructor").value = pendingShiftPrefill.instructorId;
-        pendingShiftPrefill = null;
-        toast("募集への回答から日時・講師を入力しました。コマ数を入力して作成してください。");
-      }
-      document.getElementById("shiftFilterInstructor").addEventListener("change", function () { updateAdminShiftsList(); updateAdminShiftsCalendar(); });
-      document.getElementById("shiftFilterRange").addEventListener("change", updateAdminShiftsList);
-      document.getElementById("shiftFormCancel").addEventListener("click", function () { resetShiftForm(); });
-      document.getElementById("shiftForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        submitShiftForm("normal");
-      });
-    }
-
-    if (tabId === "makeup") {
-      main.innerHTML =
-        '<div class="page-head"><h1>振替授業を追加</h1><p>生徒都合の振替授業を、後からシフトに組み込みます。通常シフトと同じ一覧・実績・給与の流れで扱われます。</p></div>' +
-        '<div class="two-col">' +
-          '<div class="card">' +
-            "<h2>振替授業を追加する</h2>" +
-            '<form id="makeupForm">' +
-              '<div class="field"><label for="mkInstructor">担当講師</label><select id="mkInstructor" required></select></div>' +
-              '<div class="field"><label for="mkDate">振替日</label><input type="date" id="mkDate" required value="' + esc(todayStr()) + '"></div>' +
-              '<div class="field-row"><div class="field"><label for="mkStart">開始</label><input type="time" id="mkStart" value="10:00"></div><div class="field"><label for="mkEnd">終了</label><input type="time" id="mkEnd" value="10:30"></div></div>' +
-              '<div class="field"><label for="mkKoma">コマ数</label><input type="number" id="mkKoma" min="1" step="1" value="1" required></div>' +
-              '<div class="field"><label for="mkNote">生徒名・備考(任意)</label><textarea id="mkNote" placeholder="例: 〇〇さん 台風による振替"></textarea></div>' +
-              '<button type="submit" class="btn btn-primary btn-block">振替授業として追加する</button>' +
-            "</form>" +
-          "</div>" +
-          '<div class="card">' +
-            "<h2>登録済みの振替授業</h2>" +
-            '<div id="list-makeup"></div>' +
-          "</div>" +
-        "</div>";
-      populateInstructorSelect("mkInstructor");
-      document.getElementById("makeupForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        var koma = Number(document.getElementById("mkKoma").value);
-        var iid = document.getElementById("mkInstructor").value;
-        var date = document.getElementById("mkDate").value;
-        if (!iid || !date || !koma) { toast("担当講師・日付・コマ数を入力してください", true); return; }
-        var body = {
-          instructorId: iid,
-          instructorName: instructorName(iid),
-          date: date,
-          startTime: document.getElementById("mkStart").value,
-          endTime: document.getElementById("mkEnd").value,
-          komaCount: koma,
-          type: "makeup",
-          note: document.getElementById("mkNote").value.trim(),
-          createdAt: Date.now(),
-          createdBy: state.myName
-        };
-        state.db.collection("shifts").add(body).then(function () {
-          toast("振替授業をシフトに追加しました");
-          notifyShiftConfirmed(body, false);
-          e.target.reset();
-          document.getElementById("mkDate").value = todayStr();
-          document.getElementById("mkKoma").value = 1;
-        }).catch(function () { toast("追加に失敗しました。もう一度お試しください。", true); });
-      });
-    }
-
-    if (tabId === "approvals") {
-      main.innerHTML =
-        '<div class="page-head"><h1>実績承認</h1><p>講師から提出されたコマ数を確認し、承認または差し戻しをします。承認済みの実績が給与集計の対象になります。</p></div>' +
-        '<div class="toolbar"><div class="field"><label for="apFilter">表示</label><select id="apFilter"><option value="pending">承認待ちのみ</option><option value="all">すべて</option></select></div></div>' +
-        '<div class="card"><div id="list-approvals"></div></div>';
-      document.getElementById("apFilter").addEventListener("change", updateApprovalsList);
-    }
-
-    if (tabId === "notices") {
-      main.innerHTML =
-        '<div class="page-head"><h1>お知らせ配信</h1><p>講師にお知らせを送ります。「すべての講師」を選ぶと全員に、講師を選ぶとその方だけに届きます。</p></div>' +
-        '<div class="two-col">' +
-          '<div class="card">' +
-            "<h2>お知らせを送る</h2>" +
-            '<form id="noticeForm">' +
-              '<div class="field"><label for="noticeTarget">送信先</label><select id="noticeTarget"></select></div>' +
-              '<div class="field"><label for="noticeTitle">件名</label><input type="text" id="noticeTitle" required maxlength="60" placeholder="例: 来月の希望シフト提出のお願い"></div>' +
-              '<div class="field"><label for="noticeBody">本文</label><textarea id="noticeBody" required placeholder="例: 9/10までに来月のシフト回答をお願いします"></textarea></div>' +
-              '<button type="submit" class="btn btn-primary btn-block">送信する</button>' +
-            "</form>" +
-          "</div>" +
-          '<div class="card"><div id="list-adminNotices"></div></div>' +
-        "</div>";
-      populateInstructorSelect("noticeTarget", true);
-      document.getElementById("noticeForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        var target = document.getElementById("noticeTarget").value;
-        var title = document.getElementById("noticeTitle").value.trim();
-        var body = document.getElementById("noticeBody").value.trim();
-        if (!title || !body) { toast("件名と本文を入力してください", true); return; }
-        state.db.collection("notifications").add({
-          title: title,
-          body: body,
-          targetInstructorId: target || null,
-          createdAt: Date.now(),
-          createdBy: state.myName,
-          readBy: [],
-          emailSent: false /* メール配信用のGoogle Apps Scriptがこの項目を見て、まだメール
-                               送信していないお知らせを見つけ、送信後にtrueへ更新する。 */
-        }).then(function () {
-          toast("お知らせを送信しました");
-          e.target.reset();
-        }).catch(function () { toast("送信に失敗しました。もう一度お試しください。", true); });
-      });
-    }
-
-    if (tabId === "payroll") {
-      main.innerHTML =
-        '<div class="page-head"><h1>給与集計・講師管理</h1><p>講師ごとの単価を設定し、月別の給与目安を集計します。</p></div>' +
-        '<div class="card">' +
-          "<h2>管理者アカウント</h2>" +
-          '<p class="card-sub">ログイン中のメールアドレス: ' + esc((state.authUser && state.authUser.email) || "") + "</p>" +
-          '<button type="button" class="btn btn-outline btn-sm" id="adminResetSelfBtn">パスワード再設定メールを送る</button>' +
-          '<p class="hint" style="margin-top:10px;">管理者を増やしたい場合は、その方に一度この画面から「講師」として登録・ログインしてもらった上で、Firebaseコンソールの settings/roles ドキュメントの adminUids にその方のログインIDを追加してください。</p>' +
-        "</div>" +
-        '<div class="card">' +
-          "<h2>講師の登録・単価設定</h2>" +
-          '<p class="card-sub">メールアドレスは、その講師がログインアカウントを作成するときに使います。ここで登録した後、講師本人がログイン画面で自分の名前を選び、パスワードを決めてアカウントを作成します。</p>' +
-          '<form id="instructorForm" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">' +
-            '<div class="field" style="flex:1;min-width:160px;margin-bottom:0;"><label for="newInstName">講師名</label><input type="text" id="newInstName" placeholder="例: 田中先生" required maxlength="30"></div>' +
-            '<div class="field" style="flex:1;min-width:200px;margin-bottom:0;"><label for="newInstEmail">メールアドレス</label><input type="email" id="newInstEmail" placeholder="例: tanaka@example.com" required></div>' +
-            '<div class="field" style="width:140px;margin-bottom:0;"><label for="newInstRate">単価(円/コマ)</label><input type="number" id="newInstRate" min="0" step="10" placeholder="例: 1500" required></div>' +
-            '<button type="submit" class="btn btn-primary">講師を追加</button>' +
-          "</form>" +
-          '<div id="list-instructors"></div>' +
-        "</div>" +
-        '<div class="card">' +
-          "<h2>月別給与集計</h2>" +
-          '<div class="toolbar"><div class="field"><label for="payrollMonth">対象月</label><input type="month" id="payrollMonth" value="' + esc(thisMonthStr()) + '"></div>' +
-            '<button type="button" class="btn btn-outline btn-sm" id="exportCsvBtn" style="margin-bottom:14px;">CSVをダウンロード</button>' +
-            '<button type="button" class="btn btn-primary btn-sm" id="finalizePayrollBtn" style="margin-bottom:14px;">この月の給与を確定して通知する</button>' +
-          "</div>" +
-          '<div id="payrollFinalizedNote" class="hint" style="margin-bottom:10px;"></div>' +
-          '<div id="payrollTable"></div>' +
-        "</div>";
-      document.getElementById("instructorForm").addEventListener("submit", function (e) {
-        e.preventDefault();
-        var name = document.getElementById("newInstName").value.trim();
-        var email = document.getElementById("newInstEmail").value.trim();
-        var rate = Number(document.getElementById("newInstRate").value);
-        if (!name) { toast("講師名を入力してください", true); return; }
-        if (!email) { toast("メールアドレスを入力してください", true); return; }
-        state.db.collection("instructors").add({ name: name, email: email, rate: rate || 0, authUid: null, active: true, createdAt: Date.now() }).then(function () {
-          toast(name + "さんを登録しました");
-          e.target.reset();
-        }).catch(function () { toast("登録に失敗しました。もう一度お試しください。", true); });
-      });
-      document.getElementById("payrollMonth").addEventListener("change", updatePayrollTable);
-      document.getElementById("exportCsvBtn").addEventListener("click", exportPayrollCsv);
-      document.getElementById("finalizePayrollBtn").addEventListener("click", function () {
-        onDangerClick(this, "もう一度押すと確定して通知します", finalizePayrollMonth);
-      });
-      var adminResetSelfBtn = document.getElementById("adminResetSelfBtn");
-      if (adminResetSelfBtn) {
-        adminResetSelfBtn.addEventListener("click", function () {
-          if (!state.authUser || !state.authUser.email) return;
-          state.auth.sendPasswordResetEmail(state.authUser.email).then(function () {
-            toast("パスワード再設定メールを送信しました");
-          }).catch(function (err) { toast(firebaseErrorMessage(err), true); });
-        });
-      }
-    }
-  }
-
-  function populateInstructorSelect(id, withAllOption) {
-    var sel = document.getElementById(id);
-    if (!sel) return;
-    var list = state.instructors.filter(function (i) { return i.active !== false; })
-      .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ja"); });
-    var options = list.map(function (i) { return '<option value="' + esc(i.id) + '">' + esc(i.name) + "</option>"; }).join("");
-    sel.innerHTML = (withAllOption ? '<option value="">すべての講師</option>' : "") + options;
-  }
-
-  function resetShiftForm() {
-    state.editingShiftId = null;
-    var form = document.getElementById("shiftForm");
-    if (!form) return;
-    form.reset();
-    document.getElementById("sfDate").value = todayStr();
-    document.getElementById("shiftFormTitle").textContent = "シフトを作成する";
-    document.getElementById("shiftFormSubmit").textContent = "シフトを作成する";
-    document.getElementById("shiftFormCancel").hidden = true;
-  }
-
-  function submitShiftForm() {
-    var iid = document.getElementById("sfInstructor").value;
-    var date = document.getElementById("sfDate").value;
-    var koma = Number(document.getElementById("sfKoma").value);
-    if (!iid || !date || !koma) { toast("講師・日付・コマ数を入力してください", true); return; }
-    var body = {
-      instructorId: iid,
-      instructorName: instructorName(iid),
-      date: date,
-      startTime: document.getElementById("sfStart").value,
-      endTime: document.getElementById("sfEnd").value,
-      komaCount: koma,
-      note: document.getElementById("sfNote").value.trim(),
-      type: "normal",
-      createdAt: Date.now(),
-      createdBy: state.myName
-    };
-    var isEdit = !!state.editingShiftId;
-    var promise;
-    if (state.editingShiftId) {
-      promise = state.db.collection("shifts").doc(state.editingShiftId).update(body);
-    } else {
-      promise = state.db.collection("shifts").add(body);
-    }
-    promise.then(function () {
-      toast(isEdit ? "シフトを更新しました" : "シフトを作成しました");
-      notifyShiftConfirmed(body, isEdit);
-      resetShiftForm();
-    }).catch(function () { toast("保存に失敗しました。もう一度お試しください。", true); });
-  }
-
-  /* シフトが作成・更新されたときに、対象の講師へアプリ内お知らせを送る。
-     notifications に emailSent:false で追加すると、既存のメール配信の
-     仕組み(お知らせ配信と共通)がそのままメール送信も行ってくれる。 */
-  function notifyShiftConfirmed(shiftBody, isEdit) {
-    if (!shiftBody || !shiftBody.instructorId) return;
-    var title;
-    if (shiftBody.type === "makeup") title = "振替授業が追加されました";
-    else title = isEdit ? "シフト内容が更新されました" : "シフトが確定しました";
-    var body = formatDateJp(shiftBody.date) + " " + timeRange(shiftBody.startTime, shiftBody.endTime) +
-      "(" + shiftBody.komaCount + "コマ)" + (shiftBody.note ? "\n備考: " + shiftBody.note : "");
-    state.db.collection("notifications").add({
-      title: title,
-      body: body,
-      targetInstructorId: shiftBody.instructorId,
-      createdAt: Date.now(),
-      createdBy: state.myName,
-      readBy: [],
-      emailSent: false
-    }).catch(function () {});
-  }
-
-  function editShift(id) {
-    var s = byId(state.shifts, id);
-    if (!s) return;
-    if (s.type === "makeup") { toast("振替授業は「振替授業を追加」タブから削除してください", true); return; }
-    state.editingShiftId = id;
-    document.getElementById("sfInstructor").value = s.instructorId;
-    document.getElementById("sfDate").value = s.date;
-    document.getElementById("sfStart").value = s.startTime || "";
-    document.getElementById("sfEnd").value = s.endTime || "";
-    document.getElementById("sfKoma").value = s.komaCount;
-    document.getElementById("sfNote").value = s.note || "";
-    document.getElementById("shiftFormTitle").textContent = "シフトを編集する";
-    document.getElementById("shiftFormSubmit").textContent = "更新する";
-    document.getElementById("shiftFormCancel").hidden = false;
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function deleteShift(id) {
-    state.db.collection("shifts").doc(id).delete().then(function () {
-      toast("シフトを削除しました");
-      if (state.editingShiftId === id) resetShiftForm();
-    }).catch(function () { toast("削除に失敗しました", true); });
-  }
-
-  function updateAdminCallsList() {
-    var el = document.getElementById("list-adminCalls");
-    if (!el) return;
-    var calls = state.shiftCalls.slice().sort(sortByDateAsc);
-    if (calls.length === 0) { el.innerHTML = '<div class="empty-state">まだシフト募集がありません</div>'; return; }
-    var activeInstructors = state.instructors.filter(function (i) { return i.active !== false; })
-      .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ja"); });
-    el.innerHTML = calls.map(function (c) {
-      var responses = state.availabilityResponses.filter(function (r) { return r.callId === c.id; });
-      var byInstId = {};
-      responses.forEach(function (r) { byInstId[r.instructorId] = r; });
-      var availableCount = responses.filter(function (r) { return r.answer === "available"; }).length;
-      var unavailableCount = responses.filter(function (r) { return r.answer === "unavailable"; }).length;
-      var noResponseCount = Math.max(activeInstructors.length - responses.length, 0);
-      var rows = activeInstructors.map(function (inst) {
-        var r = byInstId[inst.id];
-        var pill = !r ? '<span class="pill pending"><span class="dot"></span>未回答</span>' :
-          r.answer === "available" ? '<span class="pill approved"><span class="dot"></span>出勤可能</span>' :
-          '<span class="pill off"><span class="dot"></span>休み希望</span>';
-        var action = (r && r.answer === "available") ? '<button type="button" class="btn btn-outline btn-sm" data-go-shift="' + esc(c.id) + '" data-go-inst="' + esc(inst.id) + '">シフトを作成</button>' : "";
-        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line-soft);flex-wrap:wrap;">' +
-          "<span>" + esc(inst.name) + (r && r.note ? '<span class="cell-note" style="margin-left:6px;">' + esc(r.note) + "</span>" : "") + "</span>" +
-          '<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + pill + action + "</span>" +
-        "</div>";
-      }).join("");
-      var deadlineHtml = "";
-      if (c.deadline) {
-        var isOverdue = c.deadline < todayStr() && noResponseCount > 0;
-        deadlineHtml = '<span class="pill ' + (isOverdue ? "off" : "pending") + '" style="margin-left:8px;"><span class="dot"></span>回答締切 ' + esc(formatDateShort(c.deadline)) + (isOverdue ? "(超過)" : "") + "</span>";
-      }
-      return '<div class="card" style="margin-bottom:12px;">' +
-        '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">' +
-          "<div><strong>" + esc(formatDateJp(c.date)) + '</strong><span class="cell-note" style="margin-left:8px;">' + esc(timeRange(c.startTime, c.endTime)) + "</span>" + deadlineHtml + "</div>" +
-          '<button type="button" class="btn btn-danger btn-sm" data-del-call="' + esc(c.id) + '">削除</button>' +
-        "</div>" +
-        (c.note ? '<div class="cell-note" style="margin-bottom:8px;">' + esc(c.note) + "</div>" : "") +
-        '<div class="cell-note" style="margin-bottom:8px;">出勤可能 ' + availableCount + "件 ・ 休み希望 " + unavailableCount + "件 ・ 未回答 " + noResponseCount + "件</div>" +
-        "<div>" + (rows || '<div class="empty-state">対象の講師がいません</div>') + "</div>" +
-      "</div>";
-    }).join("");
-
-    el.querySelectorAll("[data-del-call]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        onDangerClick(b, "もう一度押すと削除", function () {
-          state.db.collection("shiftCalls").doc(b.getAttribute("data-del-call")).delete().then(function () { toast("削除しました"); });
-        });
-      });
-    });
-    el.querySelectorAll("[data-go-shift]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var call = byId(state.shiftCalls, b.getAttribute("data-go-shift"));
-        var instId = b.getAttribute("data-go-inst");
-        if (call) goCreateShiftFromResponse(call, instId);
-      });
-    });
-  }
-
-  function updateAdminShiftsList() {
-    var el = document.getElementById("list-adminShifts");
-    if (!el) return;
-    var instFilterEl = document.getElementById("shiftFilterInstructor");
-    var rangeFilterEl = document.getElementById("shiftFilterRange");
-    var instFilter = instFilterEl ? instFilterEl.value : "";
-    var range = rangeFilterEl ? rangeFilterEl.value : "upcoming";
-    var list = state.shifts.slice();
-    if (instFilter) list = list.filter(function (s) { return s.instructorId === instFilter; });
-    if (range === "upcoming") list = list.filter(function (s) { return s.date >= todayStr(); });
-    list.sort(sortByDateAsc);
-    if (list.length === 0) { el.innerHTML = '<div class="empty-state">該当するシフトはありません</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>日付</th><th>講師</th><th>時間</th><th>コマ数</th><th>種別</th><th>備考</th><th></th></tr></thead><tbody>' +
-      list.map(function (s) {
-        return "<tr><td>" + esc(formatDateShort(s.date)) + "</td><td>" + esc(s.instructorName) + "</td><td>" + esc(timeRange(s.startTime, s.endTime)) + "</td><td class=\"num\">" + esc(s.komaCount) + "</td><td>" +
-          (s.type === "makeup" ? '<span class="pill makeup"><span class="dot"></span>振替</span>' : '<span class="pill normal"><span class="dot"></span>通常</span>') +
-          "</td><td class=\"cell-note\">" + esc(s.note || "—") + '</td><td class="row-actions">' +
-          (s.type === "makeup" ? "" : '<button type="button" class="btn btn-outline btn-sm" data-edit-shift="' + esc(s.id) + '">編集</button>') +
-          '<button type="button" class="btn btn-danger btn-sm" data-del-shift="' + esc(s.id) + '">削除</button>' +
-          "</td></tr>";
-      }).join("") + "</tbody></table></div>";
-    el.querySelectorAll("[data-edit-shift]").forEach(function (b) { b.addEventListener("click", function () { editShift(b.getAttribute("data-edit-shift")); }); });
-    el.querySelectorAll("[data-del-shift]").forEach(function (b) { b.addEventListener("click", function () { onDangerClick(b, "もう一度押すと削除", function () { deleteShift(b.getAttribute("data-del-shift")); }); }); });
-  }
-
-  function updateMakeupList() {
-    var el = document.getElementById("list-makeup");
-    if (!el) return;
-    var list = state.shifts.filter(function (s) { return s.type === "makeup"; }).sort(sortByDateDesc);
-    if (list.length === 0) { el.innerHTML = '<div class="empty-state">登録済みの振替授業はまだありません</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>日付</th><th>講師</th><th>時間</th><th>コマ数</th><th>備考</th><th></th></tr></thead><tbody>' +
-      list.map(function (s) {
-        return "<tr><td>" + esc(formatDateShort(s.date)) + "</td><td>" + esc(s.instructorName) + "</td><td>" + esc(timeRange(s.startTime, s.endTime)) + "</td><td class=\"num\">" + esc(s.komaCount) + "</td><td class=\"cell-note\">" + esc(s.note || "—") + '</td><td><button type="button" class="btn btn-danger btn-sm" data-del-shift="' + esc(s.id) + '">削除</button></td></tr>';
-      }).join("") + "</tbody></table></div>";
-    el.querySelectorAll("[data-del-shift]").forEach(function (b) { b.addEventListener("click", function () { onDangerClick(b, "もう一度押すと削除", function () { deleteShift(b.getAttribute("data-del-shift")); }); }); });
-  }
-
-  function updateApprovalsList() {
-    var el = document.getElementById("list-approvals");
-    if (!el) return;
-    var filterEl = document.getElementById("apFilter");
-    var filter = filterEl ? filterEl.value : "pending";
-    var list = state.workReports.slice().sort(sortByDateDesc);
-    if (filter === "pending") list = list.filter(function (r) { return r.status === "pending"; });
-    if (list.length === 0) { el.innerHTML = '<div class="empty-state">該当する実績提出はありません</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>勤務日</th><th>講師</th><th>コマ数</th><th>備考</th><th>状況</th><th></th></tr></thead><tbody>' +
-      list.map(function (r) {
-        var pill = r.status === "approved" ? '<span class="pill approved"><span class="dot"></span>承認済み</span>' :
-          r.status === "rejected" ? '<span class="pill rejected"><span class="dot"></span>差し戻し</span>' :
-          '<span class="pill pending"><span class="dot"></span>承認待ち</span>';
-        var actions = r.status === "pending"
-          ? '<button type="button" class="btn btn-primary btn-sm" data-approve="' + esc(r.id) + '">承認</button><button type="button" class="btn btn-danger btn-sm" data-reject="' + esc(r.id) + '">差し戻し</button>'
-          : '<button type="button" class="btn btn-outline btn-sm" data-reset="' + esc(r.id) + '">承認待ちに戻す</button>';
-        return "<tr><td>" + esc(formatDateShort(r.date)) + "</td><td>" + esc(r.instructorName) + "</td><td class=\"num\">" + esc(r.komaCount) + "コマ</td><td class=\"cell-note\">" + esc(r.note || "—") + "</td><td>" + pill + '</td><td class="row-actions">' + actions + "</td></tr>";
-      }).join("") + "</tbody></table></div>";
-    el.querySelectorAll("[data-approve]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var id = b.getAttribute("data-approve");
-        var report = byId(state.workReports, id);
-        state.db.collection("workReports").doc(id).update({ status: "approved", decidedAt: Date.now(), adminNote: "" }).then(function () {
-          toast("承認しました");
-          notifyWorkReportDecision(report, "approved");
-        });
-      });
-    });
-    el.querySelectorAll("[data-reject]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var id = b.getAttribute("data-reject");
-        var cell = b.parentElement;
-        cell.innerHTML =
-          '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
-          '<input type="text" class="rejectReasonInput" placeholder="理由(任意)" style="width:130px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink-900);">' +
-          '<button type="button" class="btn btn-danger btn-sm" data-confirm-reject>差し戻す</button>' +
-          '<button type="button" class="btn btn-outline btn-sm" data-cancel-reject>キャンセル</button>' +
-          "</div>";
-        cell.querySelector("[data-confirm-reject]").addEventListener("click", function () {
-          var reason = cell.querySelector(".rejectReasonInput").value.trim();
-          var report = byId(state.workReports, id);
-          state.db.collection("workReports").doc(id).update({ status: "rejected", decidedAt: Date.now(), adminNote: reason }).then(function () {
-            toast("差し戻しました");
-            notifyWorkReportDecision(report, "rejected", reason);
-          });
-        });
-        cell.querySelector("[data-cancel-reject]").addEventListener("click", function () { updateApprovalsList(); });
-      });
-    });
-    el.querySelectorAll("[data-reset]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        state.db.collection("workReports").doc(b.getAttribute("data-reset")).update({ status: "pending", adminNote: "" }).then(function () { toast("承認待ちに戻しました"); });
-      });
-    });
-  }
-
-  /* 実績の承認・差し戻しが決まったときに、講師本人へアプリ内お知らせを送る。
-     notifications に emailSent:false で追加すると、既存のメール配信の
-     仕組みがそのままメール送信も行ってくれる。 */
-  function notifyWorkReportDecision(report, status, reason) {
-    if (!report || !report.instructorId) return;
-    var title = status === "approved" ? "実績が承認されました" : "実績が差し戻されました";
-    var body = formatDateJp(report.date) + "(" + report.komaCount + "コマ)の提出について、" +
-      (status === "approved" ? "承認されました。" : "差し戻されました。内容をご確認のうえ、再提出をお願いします。");
-    if (reason) body += "\n理由: " + reason;
-    state.db.collection("notifications").add({
-      title: title,
-      body: body,
-      targetInstructorId: report.instructorId,
-      createdAt: Date.now(),
-      createdBy: state.myName,
-      readBy: [],
-      emailSent: false
-    }).catch(function () {});
-  }
-
-  function updateAdminNoticesList() {
-    var el = document.getElementById("list-adminNotices");
-    if (!el) return;
-    var list = state.notifications.slice().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-    if (list.length === 0) { el.innerHTML = '<div class="empty-state">まだお知らせを送信していません</div>'; return; }
-    el.innerHTML = list.map(function (n) {
-      var target = n.targetInstructorId ? esc(instructorName(n.targetInstructorId)) + "さん宛" : "全員宛";
-      var readCount = Array.isArray(n.readBy) ? n.readBy.length : 0;
-      var when = n.createdAt ? new Date(n.createdAt).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-      return '<div class="notice-card">' +
-        '<div class="notice-title">' + esc(n.title) + "</div>" +
-        '<div class="notice-meta">' + target + " ・ " + esc(when) + " ・ 既読 " + readCount + "件</div>" +
-        '<div class="notice-body">' + esc(n.body) + "</div>" +
-        '<div class="row-actions" style="margin-top:8px;"><button type="button" class="btn btn-danger btn-sm" data-del-notice="' + esc(n.id) + '">削除</button></div>' +
-      "</div>";
-    }).join("");
-    el.querySelectorAll("[data-del-notice]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        onDangerClick(b, "もう一度押すと削除", function () {
-          state.db.collection("notifications").doc(b.getAttribute("data-del-notice")).delete().then(function () { toast("削除しました"); });
-        });
-      });
-    });
-  }
-
-  function updateInstructorAdminList() {
-    var el = document.getElementById("list-instructors");
-    if (!el) return;
-    var list = state.instructors.slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ja"); });
-    if (list.length === 0) { el.innerHTML = '<div class="empty-state">まだ講師が登録されていません</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>講師名</th><th>メールアドレス</th><th>単価(円/コマ)</th><th>今月コマ数</th><th>累計コマ数</th><th>アカウント</th><th>状態</th><th></th></tr></thead><tbody>' +
-      list.map(function (i) {
-        return "<tr><td>" + esc(i.name) + '</td><td><input type="email" class="emailInput" style="width:190px;" value="' + esc(i.email || "") + '" placeholder="未設定" data-email-id="' + esc(i.id) + '"></td><td><input type="number" class="rateInput" min="0" step="10" style="width:100px;" value="' + esc(i.rate || 0) + '" data-rate-id="' + esc(i.id) + '"></td>' +
-          '<td class="num">' + instructorApprovedKoma(i.id, thisMonthStr()) + "コマ</td>" +
-          '<td class="num">' + instructorApprovedKoma(i.id) + "コマ</td><td>" +
-          (i.authUid ? '<span class="pill approved"><span class="dot"></span>登録済み</span>' : '<span class="pill pending"><span class="dot"></span>未登録</span>') +
-          '</td><td>' +
-          (i.active === false ? '<span class="pill off"><span class="dot"></span>無効</span>' : '<span class="pill approved"><span class="dot"></span>有効</span>') +
-          '</td><td class="row-actions">' +
-          (i.active === false
-            ? '<button type="button" class="btn btn-outline btn-sm" data-activate="' + esc(i.id) + '">有効にする</button>'
-            : '<button type="button" class="btn btn-outline btn-sm" data-deactivate="' + esc(i.id) + '">無効にする</button>') +
-          '<button type="button" class="btn btn-danger btn-sm" data-del-inst="' + esc(i.id) + '">削除</button>' +
-          "</td></tr>";
-      }).join("") + "</tbody></table></div>" +
-      '<p class="hint" style="margin-top:10px;">「未登録」の講師は、まだご自身でアカウントを作成していません。ログイン画面でお名前を選んでパスワードを決めていただくと「登録済み」になります。登録済みの方のメールアドレスをここで書き換えても、ログイン用のメールアドレスは変わりません(連絡先メモとしてのみ使われます)。</p>';
-    el.querySelectorAll(".emailInput").forEach(function (inp) {
-      inp.addEventListener("change", function () {
-        var v = inp.value.trim();
-        if (!v) {
-          var inst = byId(state.instructors, inp.getAttribute("data-email-id"));
-          inp.value = (inst && inst.email) || "";
-          toast("メールアドレスは空にできません", true);
-          return;
-        }
-        state.db.collection("instructors").doc(inp.getAttribute("data-email-id")).update({ email: v }).then(function () { toast("メールアドレスを更新しました"); });
-      });
-    });
-    el.querySelectorAll(".rateInput").forEach(function (inp) {
-      inp.addEventListener("change", function () {
-        var v = Number(inp.value) || 0;
-        state.db.collection("instructors").doc(inp.getAttribute("data-rate-id")).update({ rate: v }).then(function () { toast("単価を更新しました"); });
-      });
-    });
-    el.querySelectorAll("[data-activate]").forEach(function (b) {
-      b.addEventListener("click", function () { state.db.collection("instructors").doc(b.getAttribute("data-activate")).update({ active: true }).then(function () { toast("有効にしました"); }); });
-    });
-    el.querySelectorAll("[data-deactivate]").forEach(function (b) {
-      b.addEventListener("click", function () { state.db.collection("instructors").doc(b.getAttribute("data-deactivate")).update({ active: false }).then(function () { toast("無効にしました"); }); });
-    });
-    el.querySelectorAll("[data-del-inst]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        onDangerClick(b, "もう一度押すと削除", function () {
-          state.db.collection("instructors").doc(b.getAttribute("data-del-inst")).delete().then(function () { toast("削除しました"); });
-        });
-      });
-    });
-  }
-
-  function payrollForMonth(month) {
-    var approved = state.workReports.filter(function (r) { return r.status === "approved" && r.date.slice(0, 7) === month; });
-    var byInst = {};
-    approved.forEach(function (r) {
-      var key = r.instructorId || r.instructorName;
-      if (!byInst[key]) byInst[key] = { instructorId: r.instructorId, instructorName: r.instructorName, koma: 0 };
-      byInst[key].koma += Number(r.komaCount || 0);
-    });
-    return Object.keys(byInst).map(function (k) {
-      var row = byInst[k];
-      var rate = instructorRate(row.instructorId);
-      return { instructorId: row.instructorId, instructorName: row.instructorName, koma: row.koma, rate: rate, pay: row.koma * rate };
-    }).sort(function (a, b) { return String(a.instructorName).localeCompare(String(b.instructorName), "ja"); });
-  }
-
-  /* この月分の給与が確定通知済みかどうかを表示するだけの補助表示。
-     判定は、finalizePayrollMonth() が payrollMonth 付きで作ったお知らせの有無で行う。 */
-  function updatePayrollFinalizedNote(month) {
-    var el = document.getElementById("payrollFinalizedNote");
-    if (!el) return;
-    var notices = state.notifications.filter(function (n) { return n.payrollMonth === month; });
-    if (notices.length === 0) { el.textContent = ""; return; }
-    var latest = notices.reduce(function (a, n) { return (n.createdAt || 0) > (a.createdAt || 0) ? n : a; });
-    var when = latest.createdAt ? new Date(latest.createdAt).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-    el.textContent = monthLabelJp(month) + "分は確定済みです(" + when + " に" + notices.length + "件通知)。内容を直した場合は、もう一度ボタンを押すと再通知されます。";
-  }
-
-  /* この月の承認済み実績から給与を計算し、対象の講師それぞれに
-     「給与確定」のお知らせ(アプリ内 + メール)を個別に送る。 */
-  function finalizePayrollMonth() {
-    var monthEl = document.getElementById("payrollMonth");
-    var month = monthEl ? monthEl.value : thisMonthStr();
-    var rows = payrollForMonth(month).filter(function (r) { return r.instructorId && r.koma > 0; });
-    if (rows.length === 0) { toast("この月の確定済み実績がありません", true); return; }
-    var tasks = rows.map(function (r) {
-      return state.db.collection("notifications").add({
-        title: monthLabelJp(month) + "分の給与が確定しました",
-        body: "承認済みコマ数: " + r.koma + "コマ\n給与額: " + yen(r.pay) + "\n(単価 " + yen(r.rate) + " / コマ)",
-        targetInstructorId: r.instructorId,
-        createdAt: Date.now(),
-        createdBy: state.myName,
-        readBy: [],
-        emailSent: false,
-        payrollMonth: month
-      });
-    });
-    Promise.all(tasks).then(function () {
-      toast(rows.length + "件の講師に給与確定の通知を送信しました");
-    }).catch(function () {
-      toast("一部の通知送信に失敗しました。もう一度お試しください。", true);
-    });
-  }
-
-  function updatePayrollTable() {
-    var el = document.getElementById("payrollTable");
-    if (!el) return;
-    var monthEl = document.getElementById("payrollMonth");
-    var month = monthEl ? monthEl.value : thisMonthStr();
-    updatePayrollFinalizedNote(month);
-    var rows = payrollForMonth(month);
-    if (rows.length === 0) { el.innerHTML = '<div class="empty-state">この月の承認済み実績はまだありません</div>'; return; }
-    var total = rows.reduce(function (a, r) { return a + r.pay; }, 0);
-    el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>講師</th><th>承認済みコマ数</th><th>単価</th><th>給与額</th></tr></thead><tbody>' +
-      rows.map(function (r) {
-        return "<tr><td>" + esc(r.instructorName) + "</td><td class=\"num\">" + r.koma + "コマ</td><td class=\"num\">" + yen(r.rate) + "</td><td class=\"num\"><strong>" + yen(r.pay) + "</strong></td></tr>";
-      }).join("") +
-      '<tr><td colspan="3" style="text-align:right;font-weight:700;">合計</td><td class="num" style="font-weight:700;">' + yen(total) + "</td></tr>" +
-      "</tbody></table></div>";
-  }
-
-  function csvField(v) {
-    var s = v === undefined || v === null ? "" : String(v);
-    if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
-    return s;
-  }
-
-  function exportPayrollCsv() {
-    var monthEl = document.getElementById("payrollMonth");
-    var month = monthEl ? monthEl.value : thisMonthStr();
-    var rows = payrollForMonth(month);
-    if (rows.length === 0) { toast("この月の集計データがありません", true); return; }
-    var lines = ["講師名,承認済みコマ数,単価,給与額"];
-    rows.forEach(function (r) { lines.push([csvField(r.instructorName), r.koma, r.rate, r.pay].join(",")); });
-    var total = rows.reduce(function (a, r) { return a + r.pay; }, 0);
-    lines.push(["合計", "", "", total].join(","));
-    var csv = "﻿" + lines.join("\r\n");
-    try {
-      var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement("a");
-      a.href = url;
-      a.download = "給与集計_" + month + ".csv";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-      toast("CSVを保存しました");
-    } catch (e) {
-      toast("ダウンロードに失敗しました", true);
-    }
-  }
-
-  boot();
-})();
+});
 </script>
+
 </body>
 </html>
