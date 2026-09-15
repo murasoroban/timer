@@ -444,7 +444,7 @@
   /* Bump this string every time this file is edited and republished, so
      viewers already on an older page get a "new version" prompt. Any
      sortable string works (e.g. yyyyMMddHHmm). */
-  var APP_VERSION = "202609152030";
+  var APP_VERSION = "202609152300";
   /* Googleカレンダー連携用のApps Script Webアプリの実行URL(?id=&token=を
      付けて使う)。デプロイ前は空のままにしておくと、同期ボタン自体が
      表示されない。デプロイ後にこの値を埋めて再配布する。 */
@@ -1644,13 +1644,18 @@
         '<form id="studentForm">' +
           '<div class="toolbar" style="align-items:flex-end;">' +
             '<div class="field" style="min-width:160px;"><label for="stName">生徒名</label><input type="text" id="stName" required maxlength="40" placeholder="例: 山田 太郎"></div>' +
+            '<div class="field" style="min-width:160px;"><label for="stFurigana">ふりがな</label><input type="text" id="stFurigana" maxlength="40" placeholder="例: やまだ たろう"></div>' +
             '<div class="field" style="min-width:120px;"><label for="stSoroban">珠算の級</label><input type="text" id="stSoroban" maxlength="20" placeholder="例: 5級"></div>' +
             '<div class="field" style="min-width:120px;"><label for="stAnzan">暗算の級</label><input type="text" id="stAnzan" maxlength="20" placeholder="例: 3級"></div>' +
             '<button type="submit" class="btn btn-primary">登録する</button>' +
           "</div>" +
+          '<p class="hint" style="margin-top:0;">「ふりがな」を入れておくと、五十音順に並び替えたり検索したりしやすくなります(あとから追加・修正もできます)。</p>' +
         "</form>" +
       "</div>" +
-      '<div class="card"><div id="list-students"></div></div>';
+      '<div class="card">' +
+        '<div class="field" style="max-width:320px;"><label for="stSearch">生徒を検索</label><input type="text" id="stSearch" placeholder="生徒名またはふりがなで検索"></div>' +
+        '<div id="list-students"></div>' +
+      "</div>";
 
     document.getElementById("studentForm").addEventListener("submit", function (e) {
       e.preventDefault();
@@ -1658,6 +1663,7 @@
       if (!name) { toast("生徒名を入力してください", true); return; }
       state.db.collection("students").add({
         name: name,
+        furigana: document.getElementById("stFurigana").value.trim(),
         sorobanLevel: document.getElementById("stSoroban").value.trim(),
         anzanLevel: document.getElementById("stAnzan").value.trim(),
         active: true,
@@ -1671,14 +1677,27 @@
         e.target.reset();
       }).catch(function () { toast("登録に失敗しました。もう一度お試しください。", true); });
     });
+
+    document.getElementById("stSearch").addEventListener("input", updateStudentsList);
   }
 
   function updateStudentsList() {
     var el = document.getElementById("list-students");
     if (!el) return;
-    var list = state.students.filter(function (s) { return s.active !== false; })
-      .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ja"); });
-    if (list.length === 0) { el.innerHTML = '<div class="empty-state">まだ生徒が登録されていません</div>'; return; }
+    var searchInput = document.getElementById("stSearch");
+    var query = searchInput ? searchInput.value.trim().toLowerCase() : "";
+    var all = state.students.filter(function (s) { return s.active !== false; });
+    var list = all.filter(function (s) {
+      if (!query) return true;
+      var name = String(s.name || "").toLowerCase();
+      var furigana = String(s.furigana || "").toLowerCase();
+      return name.indexOf(query) !== -1 || furigana.indexOf(query) !== -1;
+    }).sort(function (a, b) {
+      return String(a.furigana || a.name).localeCompare(String(b.furigana || b.name), "ja");
+    });
+
+    if (all.length === 0) { el.innerHTML = '<div class="empty-state">まだ生徒が登録されていません</div>'; return; }
+    if (list.length === 0) { el.innerHTML = '<div class="empty-state">「' + esc(searchInput.value.trim()) + '」に一致する生徒が見つかりません</div>'; return; }
 
     el.innerHTML = list.map(function (s) {
       var expanded = state.expandedStudentId === s.id;
@@ -1724,6 +1743,7 @@
           "</div>" +
         "</div>" +
         '<div class="student-levels">' +
+          '<div class="field"><label>ふりがな</label><input type="text" maxlength="40" style="width:160px;" value="' + esc(s.furigana || "") + '" data-furigana-id="' + esc(s.id) + '" placeholder="未設定"></div>' +
           '<div class="field"><label>珠算</label><input type="text" maxlength="20" style="width:100px;" value="' + esc(s.sorobanLevel || "") + '" data-soroban-id="' + esc(s.id) + '" placeholder="未設定"></div>' +
           '<div class="field"><label>暗算</label><input type="text" maxlength="20" style="width:100px;" value="' + esc(s.anzanLevel || "") + '" data-anzan-id="' + esc(s.id) + '" placeholder="未設定"></div>' +
         "</div>" +
@@ -1736,6 +1756,11 @@
         var id = b.getAttribute("data-toggle-student");
         state.expandedStudentId = (state.expandedStudentId === id) ? null : id;
         updateStudentsList();
+      });
+    });
+    el.querySelectorAll("[data-furigana-id]").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        state.db.collection("students").doc(inp.getAttribute("data-furigana-id")).update({ furigana: inp.value.trim() }).then(function () { toast("ふりがなを更新しました"); });
       });
     });
     el.querySelectorAll("[data-soroban-id]").forEach(function (inp) {
