@@ -354,6 +354,17 @@
   .notice-card .notice-body { font-size: .86rem; white-space: pre-wrap; }
   .notice-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--indigo-soft); color: var(--indigo); border-radius: 10px; padding: 10px 14px; margin-bottom: 18px; font-size: .84rem; font-weight: 600; flex-wrap: wrap; }
 
+  /* ---------- students ---------- */
+  .student-row { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: var(--surface); }
+  .student-row-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .student-row-head .name { font-weight: 700; font-size: 1rem; }
+  .student-levels { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .student-levels .field { margin: 0; }
+  .student-detail { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .ai-summary-box { background: var(--indigo-soft); color: var(--indigo-deep); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-size: .84rem; line-height: 1.6; }
+  .ai-summary-box .ai-summary-label { font-weight: 700; font-size: .72rem; margin-bottom: 4px; }
+  .ai-summary-box .ai-summary-meta { font-size: .68rem; opacity: .8; margin-top: 6px; }
+
   .toast-stack { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 999; max-width: 320px; }
   .toast { background: var(--ink-900); color: var(--paper); padding: 11px 16px; border-radius: 10px; font-size: .85rem; box-shadow: var(--shadow); animation: toast-in .18s ease-out; }
   .toast.error { background: var(--rose); color: #fff; }
@@ -417,6 +428,7 @@
     { id: "myshifts", label: "確定シフト一覧" },
     { id: "report", label: "実績提出" },
     { id: "summary", label: "実績・給与目安" },
+    { id: "students", label: "生徒情報" },
     { id: "notices", label: "お知らせ" }
   ];
   var ADMIN_TABS = [
@@ -424,6 +436,7 @@
     { id: "shifts", label: "シフト一覧・作成" },
     { id: "makeup", label: "振替授業を追加" },
     { id: "approvals", label: "実績承認" },
+    { id: "students", label: "生徒情報" },
     { id: "notices", label: "お知らせ配信" },
     { id: "payroll", label: "給与集計・講師管理" }
   ];
@@ -431,7 +444,11 @@
   /* Bump this string every time this file is edited and republished, so
      viewers already on an older page get a "new version" prompt. Any
      sortable string works (e.g. yyyyMMddHHmm). */
-  var APP_VERSION = "202609141600";
+  var APP_VERSION = "202609152030";
+  /* Googleカレンダー連携用のApps Script Webアプリの実行URL(?id=&token=を
+     付けて使う)。デプロイ前は空のままにしておくと、同期ボタン自体が
+     表示されない。デプロイ後にこの値を埋めて再配布する。 */
+  var CALENDAR_FEED_BASE_URL = "";
 
   /* ============ state ============ */
   var state = {
@@ -448,11 +465,15 @@
     shifts: [],
     workReports: [],
     notifications: [],
+    instructorMessages: [],
+    students: [],
+    studentNotes: [],
     roles: null,          // { adminUids: [...] }
     authUser: undefined,  // undefined = not yet resolved, null = signed out, object = signed in (Firebase Auth user)
     authReady: false,
-    ready: { instructors: false, shiftCalls: false, availabilityResponses: false, shifts: false, workReports: false, notifications: false, roles: false },
-    editingShiftId: null
+    ready: { instructors: false, shiftCalls: false, availabilityResponses: false, shifts: false, workReports: false, notifications: false, instructorMessages: false, students: false, studentNotes: false, roles: false },
+    editingShiftId: null,
+    expandedStudentId: null   // 生徒情報タブで、詳細を開いている生徒(UI表示のみに使う一時的な状態)
   };
   function isUidAdmin(uid) { return !!(uid && state.roles && Array.isArray(state.roles.adminUids) && state.roles.adminUids.indexOf(uid) !== -1); }
   function firebaseErrorMessage(err) {
@@ -501,6 +522,10 @@
       var read = Array.isArray(n.readBy) && n.readBy.indexOf(state.instructorId) !== -1;
       return forMe && !read;
     }).length;
+  }
+  function unreadInstructorMessageCount() {
+    if (state.role !== "admin") return 0;
+    return state.instructorMessages.filter(function (m) { return !m.read; }).length;
   }
 
   /* ============ utils ============ */
@@ -690,6 +715,80 @@
     wireCalendarNav(el, "instructor", updateMyShiftsCalendar);
   }
 
+  /* Googleカレンダーとの同期用リンク。ICS配信はApps Script(doGet)側が
+     行うので、ここでは講師ごとの合言葉(calendarToken)の発行・表示・
+     再発行だけを扱う。CALENDAR_FEED_BASE_URL が未設定のうちはカードごと
+     何も表示しない(Apps Script側のデプロイがまだのため)。 */
+  function updateCalendarSyncCard() {
+    var el = document.getElementById("calendarSyncCard");
+    if (!el) return;
+    if (!CALENDAR_FEED_BASE_URL) { el.innerHTML = ""; return; }
+    var inst = byId(state.instructors, state.instructorId);
+    if (!inst) { el.innerHTML = ""; return; }
+
+    if (!inst.calendarToken) {
+      el.innerHTML =
+        '<h3 style="margin:0 0 8px;">📅 Googleカレンダーと同期</h3>' +
+        '<p class="hint" style="margin:0 0 12px;">確定シフトを、ご自身のGoogleカレンダーに自動で取り込めるようにするリンクを発行します。</p>' +
+        '<button type="button" class="btn btn-outline" id="calSyncGenBtn">同期用リンクを発行する</button>';
+      var genBtn = document.getElementById("calSyncGenBtn");
+      if (genBtn) {
+        genBtn.addEventListener("click", function () {
+          genBtn.disabled = true;
+          state.db.collection("instructors").doc(inst.id).update({ calendarToken: generateCalendarToken_() })
+            .catch(function (err) { toast(firebaseErrorMessage(err), true); genBtn.disabled = false; });
+        });
+      }
+      return;
+    }
+
+    var url = CALENDAR_FEED_BASE_URL + "?id=" + encodeURIComponent(inst.id) + "&token=" + encodeURIComponent(inst.calendarToken);
+    el.innerHTML =
+      '<h3 style="margin:0 0 8px;">📅 Googleカレンダーと同期</h3>' +
+      '<p class="hint" style="margin:0 0 10px;">下のリンクを、Googleカレンダーの「他のカレンダーを追加」→「URLで追加」に貼り付けてください。一度登録すれば、以降はシフトが確定・変更されるたびに自動で反映されます(反映までに数時間かかることがあります)。</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">' +
+        '<input type="text" readonly value="' + esc(url) + '" id="calSyncUrlInput" style="flex:1;min-width:220px;" onclick="this.select()">' +
+        '<button type="button" class="btn btn-outline btn-sm" id="calSyncCopyBtn">コピー</button>' +
+      "</div>" +
+      '<button type="button" class="linklike" id="calSyncRegenBtn">リンクを再発行する(古いリンクは使えなくなります)</button>';
+
+    var copyBtn = document.getElementById("calSyncCopyBtn");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function () {
+        var input = document.getElementById("calSyncUrlInput");
+        if (input) input.select();
+        var done = function () { toast("リンクをコピーしました"); };
+        var fallback = function () {
+          try { document.execCommand("copy"); done(); }
+          catch (e) { toast("コピーできませんでした。手動で選択してコピーしてください。", true); }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(done).catch(fallback);
+        } else {
+          fallback();
+        }
+      });
+    }
+    var regenBtn = document.getElementById("calSyncRegenBtn");
+    if (regenBtn) {
+      regenBtn.addEventListener("click", function () {
+        onDangerClick(regenBtn, "もう一度押すと再発行します(今のリンクは使えなくなります)", function () {
+          state.db.collection("instructors").doc(inst.id).update({ calendarToken: generateCalendarToken_() })
+            .catch(function (err) { toast(firebaseErrorMessage(err), true); });
+        });
+      });
+    }
+  }
+  function generateCalendarToken_() {
+    var bytes = new Uint8Array(24);
+    if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
+    else for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    var chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    var out = "";
+    for (var j = 0; j < bytes.length; j++) out += chars[bytes[j] % chars.length];
+    return out;
+  }
+
   function updateAdminShiftsCalendar() {
     var el = document.getElementById("adminShiftsCalendar");
     if (!el) return;
@@ -810,6 +909,24 @@
       onDataChange();
     }, function () { state.ready.notifications = true; onDataChange(); }));
 
+    activeUnsubscribes.push(state.db.collection("instructorMessages").onSnapshot(function (snap) {
+      state.instructorMessages = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      state.ready.instructorMessages = true;
+      onDataChange();
+    }, function () { state.ready.instructorMessages = true; onDataChange(); }));
+
+    activeUnsubscribes.push(state.db.collection("students").onSnapshot(function (snap) {
+      state.students = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      state.ready.students = true;
+      onDataChange();
+    }, function () { state.ready.students = true; onDataChange(); }));
+
+    activeUnsubscribes.push(state.db.collection("studentNotes").onSnapshot(function (snap) {
+      state.studentNotes = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      state.ready.studentNotes = true;
+      onDataChange();
+    }, function () { state.ready.studentNotes = true; onDataChange(); }));
+
     activeUnsubscribes.push(state.db.doc("settings/roles").onSnapshot(function (snap) {
       state.roles = snap.exists ? snap.data() : null;
       state.ready.roles = true;
@@ -859,7 +976,7 @@
   var appStarted = false;
   var lastAuthUid = undefined; /* tracks which signed-in user we last resolved, so we only re-render the shell on an actual sign-in/sign-out transition */
   function allReady() {
-    return state.ready.instructors && state.ready.shiftCalls && state.ready.availabilityResponses && state.ready.shifts && state.ready.workReports && state.ready.notifications && state.ready.roles && state.authReady;
+    return state.ready.instructors && state.ready.shiftCalls && state.ready.availabilityResponses && state.ready.shifts && state.ready.workReports && state.ready.notifications && state.ready.instructorMessages && state.ready.students && state.ready.studentNotes && state.ready.roles && state.authReady;
   }
 
   /* Figures out state.role/instructorId/myName from the current Firebase
@@ -1128,7 +1245,7 @@
           "</div>" +
           '<nav class="nav" id="navList">' +
             tabs.map(function (t) {
-              var badge = (t.id === "notices" && state.role === "instructor") ? '<span class="nav-badge" id="noticesBadge" hidden></span>' : "";
+              var badge = (t.id === "notices") ? '<span class="nav-badge" id="noticesBadge" hidden></span>' : "";
               return '<button type="button" data-tab="' + t.id + '"><span class="dot"></span><span class="label">' + esc(t.label) + "</span>" + badge + "</button>";
             }).join("") +
           "</nav>" +
@@ -1186,15 +1303,19 @@
     updateAvailList();
     updateMyShiftsList();
     updateMyShiftsCalendar();
+    updateCalendarSyncCard();
     updateMyReportsList();
     updateSummary();
     updateNoticesList();
+    updateMyInstructorMessagesList();
+    updateStudentsList();
     updateAdminCallsList();
     updateAdminShiftsList();
     updateAdminShiftsCalendar();
     updateMakeupList();
     updateApprovalsList();
     updateAdminNoticesList();
+    updateAdminInstructorMessagesList();
     updateInstructorAdminList();
     updatePayrollTable();
   }
@@ -1214,6 +1335,7 @@
       main.innerHTML =
         '<div class="page-head"><h1>確定シフト一覧</h1><p>管理者が確定したシフトです。振替授業もここに含まれます。日付をタップすると詳細が見られます。</p></div>' +
         '<div id="unreadBanner"></div>' +
+        '<div class="card" id="calendarSyncCard" style="margin-bottom:12px;"></div>' +
         '<div class="card"><div id="myShiftsCalendar"></div></div>' +
         '<div class="card"><div id="list-myShifts"></div></div>';
     }
@@ -1226,7 +1348,7 @@
           '<div class="card">' +
             "<h2>実績を提出する</h2>" +
             '<form id="workReportForm">' +
-              '<div class="field"><label for="wrDate">勤務日</label><input type="date" id="wrDate" required value="' + esc(todayStr()) + '"></div>' +
+              '<div class="field"><label for="wrDate">勤務日</label><input type="date" id="wrDate" required max="' + esc(todayStr()) + '" value="' + esc(todayStr()) + '"></div>' +
               '<div class="field"><label for="wrShift">対応する確定シフト(任意)</label><select id="wrShift"><option value="">選択しない</option></select></div>' +
               '<div class="field"><label for="wrKoma">実績コマ数</label><input type="number" id="wrKoma" min="1" step="1" required placeholder="例: 4"></div>' +
               '<div class="field"><label for="wrNote">備考(任意)</label><textarea id="wrNote" placeholder="例: 振替1コマ含む"></textarea></div>' +
@@ -1243,6 +1365,7 @@
         var koma = Number(document.getElementById("wrKoma").value);
         var date = document.getElementById("wrDate").value;
         if (!date || !koma || koma < 1) { toast("勤務日とコマ数を入力してください", true); return; }
+        if (date > todayStr()) { toast("未来の日付は選択できません", true); return; }
         var body = {
           instructorId: state.instructorId,
           instructorName: state.myName,
@@ -1270,10 +1393,41 @@
         '<div id="summaryContent"></div>';
     }
 
+    if (tabId === "students") {
+      renderStudentsTab(main);
+    }
+
     if (tabId === "notices") {
       main.innerHTML =
-        '<div class="page-head"><h1>お知らせ</h1><p>管理者からのお知らせです。</p></div>' +
-        '<div class="card"><div id="list-notices"></div></div>';
+        '<div class="page-head"><h1>お知らせ</h1><p>管理者からのお知らせです。また、ここから管理者へ連絡することもできます。</p></div>' +
+        '<div class="two-col">' +
+          '<div class="card"><div id="list-notices"></div></div>' +
+          '<div class="card">' +
+            "<h2>管理者へ連絡する</h2><p class=\"card-sub\">シフトのこと以外でも、伝えたいことがあればここから送れます。</p>" +
+            '<form id="instructorMsgForm">' +
+              '<div class="field"><label for="imBody">内容</label><textarea id="imBody" required placeholder="例: 来月は都合により出勤日を減らしたいです"></textarea></div>' +
+              '<button type="submit" class="btn btn-primary btn-block">送信する</button>' +
+            "</form>" +
+            '<div id="list-myInstructorMessages" style="margin-top:14px;"></div>' +
+          "</div>" +
+        "</div>";
+      document.getElementById("instructorMsgForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var body = document.getElementById("imBody").value.trim();
+        if (!body) { toast("内容を入力してください", true); return; }
+        state.db.collection("instructorMessages").add({
+          instructorId: state.instructorId,
+          instructorName: state.myName,
+          body: body,
+          createdAt: Date.now(),
+          read: false,
+          emailSent: false /* メール配信用のGoogle Apps Scriptがこの項目を見て、まだメール
+                               送信していない連絡を見つけ、送信後にtrueへ更新する。 */
+        }).then(function () {
+          toast("管理者に送信しました");
+          e.target.reset();
+        }).catch(function () { toast("送信に失敗しました。もう一度お試しください。", true); });
+      });
     }
   }
 
@@ -1300,11 +1454,16 @@
     el.innerHTML = calls.map(function (c) {
       var resp = respByCall[c.id];
       var ans = resp ? resp.answer : null;
+      var isPastDeadline = !!(c.deadline && c.deadline < todayStr());
       var deadlineNote = "";
       if (c.deadline) {
-        var isOverdue = c.deadline < todayStr() && !ans;
+        var isOverdue = isPastDeadline && !ans;
         deadlineNote = '<div class="cell-note" style="margin-bottom:8px;' + (isOverdue ? "color:var(--vermillion);" : "") + '">回答締切: ' + esc(formatDateJp(c.deadline)) + (isOverdue ? "(締切を過ぎています。お早めにご回答ください)" : "") + "</div>";
       }
+      var lockedNote = isPastDeadline
+        ? '<div class="cell-note" style="margin-top:8px;color:var(--vermillion);">回答締切を過ぎているため、これ以上の変更はできません。変更が必要な場合は管理者にご連絡ください。</div>'
+        : "";
+      var dis = isPastDeadline ? " disabled" : "";
       return '<div class="card" style="margin-bottom:12px;">' +
         '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">' +
           "<div><strong>" + esc(formatDateJp(c.date)) + '</strong><strong style="margin-left:8px;">' + esc(timeRange(c.startTime, c.endTime)) + "</strong></div>" +
@@ -1315,11 +1474,12 @@
         deadlineNote +
         (c.note ? '<div class="cell-note" style="margin-bottom:10px;">' + esc(c.note) + "</div>" : "") +
         '<div class="radio-group" data-answer-group="' + esc(c.id) + '">' +
-          '<label class="radio-chip' + (ans === "available" ? " checked" : "") + '"><input type="radio" name="ans-' + esc(c.id) + '" value="available"' + (ans === "available" ? " checked" : "") + ">出勤可能</label>" +
-          '<label class="radio-chip' + (ans === "unavailable" ? " checked" : "") + '"><input type="radio" name="ans-' + esc(c.id) + '" value="unavailable"' + (ans === "unavailable" ? " checked" : "") + ">休み希望</label>" +
+          '<label class="radio-chip' + (ans === "available" ? " checked" : "") + '"><input type="radio" name="ans-' + esc(c.id) + '" value="available"' + (ans === "available" ? " checked" : "") + dis + ">出勤可能</label>" +
+          '<label class="radio-chip' + (ans === "unavailable" ? " checked" : "") + '"><input type="radio" name="ans-' + esc(c.id) + '" value="unavailable"' + (ans === "unavailable" ? " checked" : "") + dis + ">休み希望</label>" +
         "</div>" +
-        '<textarea class="answer-note" data-note-for="' + esc(c.id) + '" placeholder="備考(任意)" style="margin-top:8px;">' + esc(resp && resp.note ? resp.note : "") + "</textarea>" +
-        '<button type="button" class="btn btn-primary btn-sm" style="margin-top:8px;" data-save-answer="' + esc(c.id) + '">回答を保存する</button>' +
+        '<textarea class="answer-note" data-note-for="' + esc(c.id) + '" placeholder="備考(任意)" style="margin-top:8px;"' + dis + ">" + esc(resp && resp.note ? resp.note : "") + "</textarea>" +
+        (isPastDeadline ? "" : '<button type="button" class="btn btn-primary btn-sm" style="margin-top:8px;" data-save-answer="' + esc(c.id) + '">回答を保存する</button>') +
+        lockedNote +
       "</div>";
     }).join("");
 
@@ -1332,6 +1492,7 @@
       btn.addEventListener("click", function () {
         var callId = btn.getAttribute("data-save-answer");
         var call = byId(state.shiftCalls, callId);
+        if (call && call.deadline && call.deadline < todayStr()) { toast("回答締切を過ぎているため変更できません", true); return; }
         var group = el.querySelector('[data-answer-group="' + callId + '"]');
         var checked = group ? group.querySelector("input:checked") : null;
         if (!checked) { toast("出勤可能か休み希望を選んでください", true); return; }
@@ -1382,6 +1543,21 @@
     }).join("");
   }
 
+  function updateMyInstructorMessagesList() {
+    var el = document.getElementById("list-myInstructorMessages");
+    if (!el) return;
+    var mine = state.instructorMessages.filter(function (m) { return m.instructorId === state.instructorId; })
+      .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    if (mine.length === 0) { el.innerHTML = ""; return; }
+    el.innerHTML = '<h2 style="margin-top:0;">送信履歴</h2>' + mine.map(function (m) {
+      var when = m.createdAt ? new Date(m.createdAt).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+      return '<div class="notice-card">' +
+        '<div class="notice-meta">' + esc(when) + " ・ " + (m.read ? "管理者が既読" : "未読") + "</div>" +
+        '<div class="notice-body">' + esc(m.body) + "</div>" +
+      "</div>";
+    }).join("");
+  }
+
   function updateUnreadBanner() {
     var el = document.getElementById("unreadBanner");
     if (!el) return;
@@ -1392,7 +1568,7 @@
   }
 
   function updateNavBadge() {
-    var n = myUnreadNoticeCount();
+    var n = state.role === "admin" ? unreadInstructorMessageCount() : myUnreadNoticeCount();
     var el = document.getElementById("noticesBadge");
     if (el) { if (n > 0) { el.textContent = n; el.hidden = false; } else { el.hidden = true; } }
     var mb = document.getElementById("noticesBadgeMobile");
@@ -1455,6 +1631,150 @@
         '<div class="stat-card"><div class="label">承認待ちの提出</div><div class="value num">' + pendingCount + '<span class="unit">件</span></div></div>' +
       "</div>" +
       '<p class="hint">単価: ' + yen(rate) + " / コマ(管理者が設定)。給与目安は承認済みの実績のみで計算しています。</p>";
+  }
+
+  /* =====================================================================
+     STUDENTS(生徒情報。講師・管理者どちらの画面からも同じ内容を見る/書ける)
+     ===================================================================== */
+  function renderStudentsTab(main) {
+    main.innerHTML =
+      '<div class="page-head"><h1>生徒情報</h1><p>生徒ごとの珠算・暗算の級や、講師どうしで共有したい様子を記録します。ここに書いた内容は全講師が見られます。</p></div>' +
+      '<div class="card" style="margin-bottom:16px;">' +
+        "<h2>生徒を新規登録する</h2>" +
+        '<form id="studentForm">' +
+          '<div class="toolbar" style="align-items:flex-end;">' +
+            '<div class="field" style="min-width:160px;"><label for="stName">生徒名</label><input type="text" id="stName" required maxlength="40" placeholder="例: 山田 太郎"></div>' +
+            '<div class="field" style="min-width:120px;"><label for="stSoroban">珠算の級</label><input type="text" id="stSoroban" maxlength="20" placeholder="例: 5級"></div>' +
+            '<div class="field" style="min-width:120px;"><label for="stAnzan">暗算の級</label><input type="text" id="stAnzan" maxlength="20" placeholder="例: 3級"></div>' +
+            '<button type="submit" class="btn btn-primary">登録する</button>' +
+          "</div>" +
+        "</form>" +
+      "</div>" +
+      '<div class="card"><div id="list-students"></div></div>';
+
+    document.getElementById("studentForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = document.getElementById("stName").value.trim();
+      if (!name) { toast("生徒名を入力してください", true); return; }
+      state.db.collection("students").add({
+        name: name,
+        sorobanLevel: document.getElementById("stSoroban").value.trim(),
+        anzanLevel: document.getElementById("stAnzan").value.trim(),
+        active: true,
+        summary: "",
+        summaryUpdatedAt: null,
+        needsSummaryUpdate: false,
+        createdAt: Date.now(),
+        createdBy: state.myName
+      }).then(function () {
+        toast("生徒を登録しました");
+        e.target.reset();
+      }).catch(function () { toast("登録に失敗しました。もう一度お試しください。", true); });
+    });
+  }
+
+  function updateStudentsList() {
+    var el = document.getElementById("list-students");
+    if (!el) return;
+    var list = state.students.filter(function (s) { return s.active !== false; })
+      .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ja"); });
+    if (list.length === 0) { el.innerHTML = '<div class="empty-state">まだ生徒が登録されていません</div>'; return; }
+
+    el.innerHTML = list.map(function (s) {
+      var expanded = state.expandedStudentId === s.id;
+      var notes = state.studentNotes.filter(function (n) { return n.studentId === s.id; })
+        .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      var detailHtml = "";
+      if (expanded) {
+        var summaryHtml = s.summary
+          ? '<div class="ai-summary-box">' +
+              '<div class="ai-summary-label">AIによる要約(直近の記録から自動作成)</div>' +
+              "<div>" + esc(s.summary) + "</div>" +
+              '<div class="ai-summary-meta">' + (s.summaryUpdatedAt ? "最終更新: " + esc(new Date(s.summaryUpdatedAt).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })) : "") + "</div>" +
+            "</div>"
+          : '<p class="hint">まだ要約はありません。記録がたまると自動で作成されます(数分〜数十分ほどかかることがあります)。</p>';
+
+        var notesHtml = notes.length === 0
+          ? '<div class="empty-state">まだ記録はありません</div>'
+          : notes.map(function (n) {
+              var when = n.createdAt ? new Date(n.createdAt).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+              return '<div class="notice-card">' +
+                '<div class="notice-body">' + esc(n.body) + "</div>" +
+                '<div class="notice-meta" style="margin-top:6px;margin-bottom:0;">' + esc(when) + " ・ " + esc(n.authorName || "") + "</div>" +
+              "</div>";
+            }).join("");
+
+        detailHtml =
+          '<div class="student-detail">' +
+            summaryHtml +
+            '<form data-note-form="' + esc(s.id) + '" style="margin-bottom:14px;">' +
+              '<div class="field"><label for="noteBody-' + esc(s.id) + '">情報を共有する</label><textarea id="noteBody-' + esc(s.id) + '" required placeholder="例: 今日は繰り上がりの練習を頑張っていました"></textarea></div>' +
+              '<button type="submit" class="btn btn-primary btn-sm">送信する</button>' +
+            "</form>" +
+            "<h2>これまでの記録</h2>" +
+            notesHtml +
+          "</div>";
+      }
+      return '<div class="student-row">' +
+        '<div class="student-row-head">' +
+          '<div class="name">' + esc(s.name) + "</div>" +
+          '<div style="display:flex;gap:8px;align-items:center;">' +
+            '<button type="button" class="btn btn-outline btn-sm" data-toggle-student="' + esc(s.id) + '">' + (expanded ? "閉じる" : "詳しく見る") + "</button>" +
+            (state.role === "admin" ? '<button type="button" class="btn btn-danger btn-sm" data-del-student="' + esc(s.id) + '">削除</button>' : "") +
+          "</div>" +
+        "</div>" +
+        '<div class="student-levels">' +
+          '<div class="field"><label>珠算</label><input type="text" maxlength="20" style="width:100px;" value="' + esc(s.sorobanLevel || "") + '" data-soroban-id="' + esc(s.id) + '" placeholder="未設定"></div>' +
+          '<div class="field"><label>暗算</label><input type="text" maxlength="20" style="width:100px;" value="' + esc(s.anzanLevel || "") + '" data-anzan-id="' + esc(s.id) + '" placeholder="未設定"></div>' +
+        "</div>" +
+        detailHtml +
+      "</div>";
+    }).join("");
+
+    el.querySelectorAll("[data-toggle-student]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var id = b.getAttribute("data-toggle-student");
+        state.expandedStudentId = (state.expandedStudentId === id) ? null : id;
+        updateStudentsList();
+      });
+    });
+    el.querySelectorAll("[data-soroban-id]").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        state.db.collection("students").doc(inp.getAttribute("data-soroban-id")).update({ sorobanLevel: inp.value.trim() }).then(function () { toast("珠算の級を更新しました"); });
+      });
+    });
+    el.querySelectorAll("[data-anzan-id]").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        state.db.collection("students").doc(inp.getAttribute("data-anzan-id")).update({ anzanLevel: inp.value.trim() }).then(function () { toast("暗算の級を更新しました"); });
+      });
+    });
+    el.querySelectorAll("[data-del-student]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        onDangerClick(b, "もう一度押すと削除", function () {
+          state.db.collection("students").doc(b.getAttribute("data-del-student")).delete().then(function () { toast("削除しました"); });
+        });
+      });
+    });
+    el.querySelectorAll("[data-note-form]").forEach(function (form) {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var studentId = form.getAttribute("data-note-form");
+        var ta = document.getElementById("noteBody-" + studentId);
+        var body = ta.value.trim();
+        if (!body) { toast("内容を入力してください", true); return; }
+        state.db.collection("studentNotes").add({
+          studentId: studentId,
+          authorUid: state.authUser.uid,
+          authorName: state.myName,
+          body: body,
+          createdAt: Date.now()
+        }).then(function () {
+          return state.db.collection("students").doc(studentId).update({ needsSummaryUpdate: true });
+        }).then(function () {
+          toast("共有しました");
+        }).catch(function () { toast("送信に失敗しました。もう一度お試しください。", true); });
+      });
+    });
   }
 
   /* =====================================================================
@@ -1608,9 +1928,14 @@
       document.getElementById("apFilter").addEventListener("change", updateApprovalsList);
     }
 
+    if (tabId === "students") {
+      renderStudentsTab(main);
+    }
+
     if (tabId === "notices") {
       main.innerHTML =
         '<div class="page-head"><h1>お知らせ配信</h1><p>講師にお知らせを送ります。「すべての講師」を選ぶと全員に、講師を選ぶとその方だけに届きます。</p></div>' +
+        '<div class="card"><h2>講師からの連絡</h2><div id="list-instructorMsgs"></div></div>' +
         '<div class="two-col">' +
           '<div class="card">' +
             "<h2>お知らせを送る</h2>" +
@@ -1807,6 +2132,15 @@
     if (calls.length === 0) { el.innerHTML = '<div class="empty-state">まだシフト募集がありません</div>'; return; }
     var activeInstructors = state.instructors.filter(function (i) { return i.active !== false; })
       .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ja"); });
+    function compactGroupHtml(list, byInstId, pillClass, pillLabel) {
+      if (list.length === 0) return "";
+      var names = list.map(function (inst) {
+        var r = byInstId[inst.id];
+        return esc(inst.name) + (r && r.note ? "(" + esc(r.note) + ")" : "");
+      }).join("、");
+      return '<div class="cell-note" style="padding:6px 0;border-top:1px solid var(--line-soft);">' +
+        '<span class="pill ' + pillClass + '" style="margin-right:6px;"><span class="dot"></span>' + pillLabel + "(" + list.length + "人)</span>" + names + "</div>";
+    }
     el.innerHTML = calls.map(function (c) {
       var responses = state.availabilityResponses.filter(function (r) { return r.callId === c.id; });
       var byInstId = {};
@@ -1814,17 +2148,25 @@
       var availableCount = responses.filter(function (r) { return r.answer === "available"; }).length;
       var unavailableCount = responses.filter(function (r) { return r.answer === "unavailable"; }).length;
       var noResponseCount = Math.max(activeInstructors.length - responses.length, 0);
-      var rows = activeInstructors.map(function (inst) {
+      /* 講師の人数が増えても見づらくならないよう、状態ごとにまとめる。
+         「シフトを作成」の操作が必要な出勤可能な講師だけを1人1行で目立たせ、
+         休み希望・未回答は名前を並べるだけのコンパクトな1〜数行にする。 */
+      var availableList = [], unavailableList = [], noResponseList = [];
+      activeInstructors.forEach(function (inst) {
         var r = byInstId[inst.id];
-        var pill = !r ? '<span class="pill pending"><span class="dot"></span>未回答</span>' :
-          r.answer === "available" ? '<span class="pill approved"><span class="dot"></span>出勤可能</span>' :
-          '<span class="pill off"><span class="dot"></span>休み希望</span>';
-        var action = (r && r.answer === "available") ? '<button type="button" class="btn btn-outline btn-sm" data-go-shift="' + esc(c.id) + '" data-go-inst="' + esc(inst.id) + '">シフトを作成</button>' : "";
+        if (!r) noResponseList.push(inst);
+        else if (r.answer === "available") availableList.push(inst);
+        else unavailableList.push(inst);
+      });
+      var availableRows = availableList.map(function (inst) {
+        var r = byInstId[inst.id];
         return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line-soft);flex-wrap:wrap;">' +
-          "<span>" + esc(inst.name) + (r && r.note ? '<span class="cell-note" style="margin-left:6px;">' + esc(r.note) + "</span>" : "") + "</span>" +
-          '<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + pill + action + "</span>" +
+          "<span>" + esc(inst.name) + (r.note ? '<span class="cell-note" style="margin-left:6px;">' + esc(r.note) + "</span>" : "") + "</span>" +
+          '<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span class="pill approved"><span class="dot"></span>出勤可能</span>' +
+            '<button type="button" class="btn btn-outline btn-sm" data-go-shift="' + esc(c.id) + '" data-go-inst="' + esc(inst.id) + '">シフトを作成</button></span>' +
         "</div>";
       }).join("");
+      var rows = availableRows + compactGroupHtml(unavailableList, byInstId, "off", "休み希望") + compactGroupHtml(noResponseList, byInstId, "pending", "未回答");
       var deadlineHtml = "";
       if (c.deadline) {
         var isOverdue = c.deadline < todayStr() && noResponseCount > 0;
@@ -1990,6 +2332,40 @@
       b.addEventListener("click", function () {
         onDangerClick(b, "もう一度押すと削除", function () {
           state.db.collection("notifications").doc(b.getAttribute("data-del-notice")).delete().then(function () { toast("削除しました"); });
+        });
+      });
+    });
+  }
+
+  /* 講師からの連絡を管理者が開いたタイミングで、未読のものをまとめて
+     既読にする(講師側のお知らせを開いたときの動きと同じ考え方)。 */
+  function markInstructorMessagesRead() {
+    if (state.role !== "admin") return;
+    var unread = state.instructorMessages.filter(function (m) { return !m.read; });
+    unread.forEach(function (m) {
+      state.db.collection("instructorMessages").doc(m.id).update({ read: true }).catch(function () {});
+    });
+  }
+
+  function updateAdminInstructorMessagesList() {
+    var el = document.getElementById("list-instructorMsgs");
+    if (!el) return;
+    markInstructorMessagesRead();
+    var list = state.instructorMessages.slice().sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    if (list.length === 0) { el.innerHTML = '<div class="empty-state">講師からの連絡はまだありません</div>'; return; }
+    el.innerHTML = list.map(function (m) {
+      var when = m.createdAt ? new Date(m.createdAt).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+      return '<div class="notice-card' + (m.read ? "" : " unread") + '">' +
+        '<div class="notice-title">' + esc(m.instructorName || instructorName(m.instructorId)) + "さんより</div>" +
+        '<div class="notice-meta">' + esc(when) + "</div>" +
+        '<div class="notice-body">' + esc(m.body) + "</div>" +
+        '<div class="row-actions" style="margin-top:8px;"><button type="button" class="btn btn-danger btn-sm" data-del-instmsg="' + esc(m.id) + '">削除</button></div>' +
+      "</div>";
+    }).join("");
+    el.querySelectorAll("[data-del-instmsg]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        onDangerClick(b, "もう一度押すと削除", function () {
+          state.db.collection("instructorMessages").doc(b.getAttribute("data-del-instmsg")).delete().then(function () { toast("削除しました"); });
         });
       });
     });
