@@ -444,7 +444,7 @@
   /* Bump this string every time this file is edited and republished, so
      viewers already on an older page get a "new version" prompt. Any
      sortable string works (e.g. yyyyMMddHHmm). */
-  var APP_VERSION = "202609152300";
+  var APP_VERSION = "202609161000";
   /* Googleカレンダー連携用のApps Script Webアプリの実行URL(?id=&token=を
      付けて使う)。デプロイ前は空のままにしておくと、同期ボタン自体が
      表示されない。デプロイ後にこの値を埋めて再配布する。 */
@@ -468,10 +468,11 @@
     instructorMessages: [],
     students: [],
     studentNotes: [],
+    makeupCalls: [],
     roles: null,          // { adminUids: [...] }
     authUser: undefined,  // undefined = not yet resolved, null = signed out, object = signed in (Firebase Auth user)
     authReady: false,
-    ready: { instructors: false, shiftCalls: false, availabilityResponses: false, shifts: false, workReports: false, notifications: false, instructorMessages: false, students: false, studentNotes: false, roles: false },
+    ready: { instructors: false, shiftCalls: false, availabilityResponses: false, shifts: false, workReports: false, notifications: false, instructorMessages: false, students: false, studentNotes: false, makeupCalls: false, roles: false },
     editingShiftId: null,
     expandedStudentId: null   // 生徒情報タブで、詳細を開いている生徒(UI表示のみに使う一時的な状態)
   };
@@ -620,6 +621,46 @@
   function instructorRate(id) {
     var it = byId(state.instructors, id);
     return it ? Number(it.rate) || 0 : 0;
+  }
+  function studentName(id) {
+    var s = byId(state.students, id);
+    return s ? s.name : "(不明な生徒)";
+  }
+  function studentNames(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return "";
+    return ids.map(studentName).join("、");
+  }
+  /* 生徒をチップ形式のチェックボックスで複数選択させるための共通HTML。
+     idPrefix はフォームごとに要素idを衝突させないための接頭辞。 */
+  function studentCheckboxesHtml(idPrefix, selectedIds) {
+    var list = state.students.filter(function (s) { return s.active !== false; })
+      .sort(function (a, b) { return String(a.furigana || a.name).localeCompare(String(b.furigana || b.name), "ja"); });
+    if (list.length === 0) return '<p class="hint">先に「生徒情報」タブで生徒を登録すると、ここから選択できるようになります。</p>';
+    var sel = selectedIds || [];
+    return '<div class="radio-group" id="' + idPrefix + '">' + list.map(function (s) {
+      var checked = sel.indexOf(s.id) !== -1;
+      return '<label class="radio-chip' + (checked ? " checked" : "") + '"><input type="checkbox" value="' + esc(s.id) + '"' + (checked ? " checked" : "") + ">" + esc(s.name) + "</label>";
+    }).join("") + "</div>";
+  }
+  function wireStudentCheckboxes(idPrefix) {
+    var group = document.getElementById(idPrefix);
+    if (!group) return;
+    group.addEventListener("change", function () {
+      group.querySelectorAll(".radio-chip").forEach(function (c) { c.classList.toggle("checked", c.querySelector("input").checked); });
+    });
+  }
+  function getCheckedValues(idPrefix) {
+    var group = document.getElementById(idPrefix);
+    if (!group) return [];
+    return Array.prototype.slice.call(group.querySelectorAll("input:checked")).map(function (i) { return i.value; });
+  }
+  /* form.reset()はチェックボックスの状態自体は元に戻すが、changeイベントが
+     発火しないため、チップの見た目(checkedクラス)が選択されたままに見えて
+     しまう。フォームをリセットしたあとに呼んで、見た目も揃える。 */
+  function resetStudentCheckboxes(idPrefix) {
+    var group = document.getElementById(idPrefix);
+    if (!group) return;
+    group.querySelectorAll(".radio-chip").forEach(function (c) { c.classList.remove("checked"); });
   }
   /* 承認済み実績のコマ数を合計する。month を指定するとその月のみ、
      省略すると全期間の累計になる。 */
@@ -927,6 +968,12 @@
       onDataChange();
     }, function () { state.ready.studentNotes = true; onDataChange(); }));
 
+    activeUnsubscribes.push(state.db.collection("makeupCalls").onSnapshot(function (snap) {
+      state.makeupCalls = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      state.ready.makeupCalls = true;
+      onDataChange();
+    }, function () { state.ready.makeupCalls = true; onDataChange(); }));
+
     activeUnsubscribes.push(state.db.doc("settings/roles").onSnapshot(function (snap) {
       state.roles = snap.exists ? snap.data() : null;
       state.ready.roles = true;
@@ -976,7 +1023,7 @@
   var appStarted = false;
   var lastAuthUid = undefined; /* tracks which signed-in user we last resolved, so we only re-render the shell on an actual sign-in/sign-out transition */
   function allReady() {
-    return state.ready.instructors && state.ready.shiftCalls && state.ready.availabilityResponses && state.ready.shifts && state.ready.workReports && state.ready.notifications && state.ready.instructorMessages && state.ready.students && state.ready.studentNotes && state.ready.roles && state.authReady;
+    return state.ready.instructors && state.ready.shiftCalls && state.ready.availabilityResponses && state.ready.shifts && state.ready.workReports && state.ready.notifications && state.ready.instructorMessages && state.ready.students && state.ready.studentNotes && state.ready.makeupCalls && state.ready.roles && state.authReady;
   }
 
   /* Figures out state.role/instructorId/myName from the current Firebase
@@ -1300,6 +1347,7 @@
     markActiveNav();
     updateNavBadge();
     updateUnreadBanner();
+    updateMakeupCallsCard();
     updateAvailList();
     updateMyShiftsList();
     updateMyShiftsCalendar();
@@ -1313,6 +1361,7 @@
     updateAdminShiftsList();
     updateAdminShiftsCalendar();
     updateMakeupList();
+    updateAdminMakeupCallsOpenList();
     updateApprovalsList();
     updateAdminNoticesList();
     updateAdminInstructorMessagesList();
@@ -1328,6 +1377,7 @@
       main.innerHTML =
         '<div class="page-head"><h1>シフト回答</h1><p>管理者が指定した日時ごとに、出勤できるかどうかを回答してください。回答はいつでも変更できます。</p></div>' +
         '<div id="unreadBanner"></div>' +
+        '<div class="card" id="makeupCallsCard" style="margin-bottom:16px;"></div>' +
         '<div class="card"><div id="list-availCalls"></div></div>';
     }
 
@@ -1440,6 +1490,36 @@
       return '<option value="' + esc(s.id) + '">' + esc(formatDateShort(s.date)) + " " + esc(timeRange(s.startTime, s.endTime)) + " ・" + esc(s.komaCount) + "コマ" + (s.type === "makeup" ? "(振替)" : "") + "</option>";
     }).join("");
     if (cur && mine.some(function (s) { return s.id === cur; })) sel.value = cur;
+  }
+
+  /* 振替授業の「早い者勝ち募集」カード。まだ誰も担当していない(status
+     が "open")募集だけを表示する。担当が決まった募集は、全員の画面から
+     自動的に消える(status が "claimed" に変わり、この一覧の対象外になる
+     ため)。 */
+  function updateMakeupCallsCard() {
+    var el = document.getElementById("makeupCallsCard");
+    if (!el) return;
+    var open = state.makeupCalls.filter(function (c) { return c.status === "open"; }).sort(sortByDateAsc);
+    if (open.length === 0) { el.innerHTML = ""; return; }
+    el.innerHTML =
+      "<h2>振替授業の募集</h2>" +
+      '<p class="card-sub">「担当する」を押した講師が担当になります。すでに担当が決まった募集はここから消えます。</p>' +
+      open.map(function (c) {
+        var studentLine = c.studentIds && c.studentIds.length ? "<div class=\"notice-meta\" style=\"margin-bottom:0;\">対象の生徒: " + esc(studentNames(c.studentIds)) + "</div>" : "";
+        return '<div class="notice-card">' +
+          "<div><strong>" + esc(formatDateJp(c.date)) + '</strong><strong style="margin-left:8px;">' + esc(timeRange(c.startTime, c.endTime)) + "</strong><span class=\"cell-note\" style=\"margin-left:8px;\">" + esc(c.komaCount) + "コマ</span></div>" +
+          studentLine +
+          (c.note ? '<div class="notice-body" style="margin-top:6px;">' + esc(c.note) + "</div>" : "") +
+          '<div class="row-actions" style="margin-top:10px;"><button type="button" class="btn btn-primary btn-sm" data-claim-call="' + esc(c.id) + '">担当する</button></div>' +
+        "</div>";
+      }).join("");
+    el.querySelectorAll("[data-claim-call]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        onDangerClick(b, "もう一度押すと担当が確定します", function () {
+          claimMakeupCall(b.getAttribute("data-claim-call"));
+        });
+      });
+    });
   }
 
   function updateAvailList() {
@@ -1584,9 +1664,10 @@
     var past = mine.filter(function (s) { return s.date < today; }).sort(sortByDateDesc);
     function rows(list) {
       return list.map(function (s) {
+        var studentLine = s.studentIds && s.studentIds.length ? "対象: " + studentNames(s.studentIds) + (s.note ? " / " : "") : "";
         return "<tr><td>" + esc(formatDateJp(s.date)) + "</td><td>" + esc(timeRange(s.startTime, s.endTime)) + "</td><td class=\"num\">" + esc(s.komaCount) + "コマ</td><td>" +
           (s.type === "makeup" ? '<span class="pill makeup"><span class="dot"></span>振替授業</span>' : '<span class="pill normal"><span class="dot"></span>通常</span>') +
-          "</td><td class=\"cell-note\">" + esc(s.note || "—") + "</td></tr>";
+          "</td><td class=\"cell-note\">" + esc(studentLine) + esc(s.note || (studentLine ? "" : "—")) + "</td></tr>";
       }).join("");
     }
     var html = "";
@@ -1899,15 +1980,35 @@
     if (tabId === "makeup") {
       main.innerHTML =
         '<div class="page-head"><h1>振替授業を追加</h1><p>生徒都合の振替授業を、後からシフトに組み込みます。通常シフトと同じ一覧・実績・給与の流れで扱われます。</p></div>' +
+        '<div class="two-col" style="margin-bottom:20px;">' +
+          '<div class="card">' +
+            "<h2>講師に担当を募集する</h2>" +
+            '<p class="card-sub">全講師に通知(アプリ内・メール)が届き、最初に「担当する」を押した講師に決まります。</p>' +
+            '<form id="makeupCallForm">' +
+              '<div class="field"><label for="mcDate">振替日</label><input type="date" id="mcDate" required value="' + esc(todayStr()) + '"></div>' +
+              '<div class="field-row"><div class="field"><label for="mcStart">開始</label><input type="time" id="mcStart" value="10:00"></div><div class="field"><label for="mcEnd">終了</label><input type="time" id="mcEnd" value="10:30"></div></div>' +
+              '<div class="field"><label for="mcKoma">コマ数</label><input type="number" id="mcKoma" min="1" step="1" value="1" required></div>' +
+              '<div class="field"><label>対象の生徒(複数選択可)</label>' + studentCheckboxesHtml("mcStudents", []) + "</div>" +
+              '<div class="field"><label for="mcNote">備考(任意)</label><textarea id="mcNote" placeholder="例: 台風による振替"></textarea></div>' +
+              '<button type="submit" class="btn btn-primary btn-block">この内容で募集する</button>' +
+            "</form>" +
+          "</div>" +
+          '<div class="card">' +
+            "<h2>募集中の振替授業</h2>" +
+            '<div id="list-makeupCallsOpen"></div>' +
+          "</div>" +
+        "</div>" +
         '<div class="two-col">' +
           '<div class="card">' +
-            "<h2>振替授業を追加する</h2>" +
+            "<h2>担当講師を直接指定して追加する</h2>" +
+            '<p class="card-sub">すでに担当が決まっている場合は、募集をかけずにここから直接追加できます。</p>' +
             '<form id="makeupForm">' +
               '<div class="field"><label for="mkInstructor">担当講師</label><select id="mkInstructor" required></select></div>' +
               '<div class="field"><label for="mkDate">振替日</label><input type="date" id="mkDate" required value="' + esc(todayStr()) + '"></div>' +
               '<div class="field-row"><div class="field"><label for="mkStart">開始</label><input type="time" id="mkStart" value="10:00"></div><div class="field"><label for="mkEnd">終了</label><input type="time" id="mkEnd" value="10:30"></div></div>' +
               '<div class="field"><label for="mkKoma">コマ数</label><input type="number" id="mkKoma" min="1" step="1" value="1" required></div>' +
-              '<div class="field"><label for="mkNote">生徒名・備考(任意)</label><textarea id="mkNote" placeholder="例: 〇〇さん 台風による振替"></textarea></div>' +
+              '<div class="field"><label>対象の生徒(複数選択可)</label>' + studentCheckboxesHtml("mkStudents", []) + "</div>" +
+              '<div class="field"><label for="mkNote">備考(任意)</label><textarea id="mkNote" placeholder="例: 台風による振替"></textarea></div>' +
               '<button type="submit" class="btn btn-primary btn-block">振替授業として追加する</button>' +
             "</form>" +
           "</div>" +
@@ -1916,7 +2017,53 @@
             '<div id="list-makeup"></div>' +
           "</div>" +
         "</div>";
+      wireStudentCheckboxes("mcStudents");
+      wireStudentCheckboxes("mkStudents");
       populateInstructorSelect("mkInstructor");
+
+      document.getElementById("makeupCallForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var koma = Number(document.getElementById("mcKoma").value);
+        var date = document.getElementById("mcDate").value;
+        if (!date || !koma) { toast("振替日・コマ数を入力してください", true); return; }
+        var studentIds = getCheckedValues("mcStudents");
+        var call = {
+          date: date,
+          startTime: document.getElementById("mcStart").value,
+          endTime: document.getElementById("mcEnd").value,
+          komaCount: koma,
+          studentIds: studentIds,
+          note: document.getElementById("mcNote").value.trim(),
+          status: "open",
+          claimedByInstructorId: null,
+          claimedByInstructorName: null,
+          claimedAt: null,
+          shiftId: null,
+          createdAt: Date.now(),
+          createdBy: state.myName
+        };
+        state.db.collection("makeupCalls").add(call).then(function () {
+          var studentLine = studentIds.length ? "\n対象の生徒: " + studentNames(studentIds) : "";
+          return state.db.collection("notifications").add({
+            title: "振替授業の担当を募集しています",
+            body: formatDateJp(call.date) + " " + timeRange(call.startTime, call.endTime) + "(" + call.komaCount + "コマ)" + studentLine +
+              (call.note ? "\n備考: " + call.note : "") + "\n\n「シフト回答」の上にある「振替授業の募集」から、先着順で担当できます。",
+            targetInstructorId: null,
+            createdAt: Date.now(),
+            createdBy: state.myName,
+            readBy: [],
+            emailSent: false
+          });
+        }).then(function () {
+          toast("講師への募集を送りました");
+          e.target.reset();
+          resetStudentCheckboxes("mcStudents");
+          document.getElementById("mcDate").value = todayStr();
+          document.getElementById("mcKoma").value = 1;
+          updateAdminMakeupCallsOpenList();
+        }).catch(function () { toast("募集の送信に失敗しました。もう一度お試しください。", true); });
+      });
+
       document.getElementById("makeupForm").addEventListener("submit", function (e) {
         e.preventDefault();
         var koma = Number(document.getElementById("mkKoma").value);
@@ -1931,6 +2078,7 @@
           endTime: document.getElementById("mkEnd").value,
           komaCount: koma,
           type: "makeup",
+          studentIds: getCheckedValues("mkStudents"),
           note: document.getElementById("mkNote").value.trim(),
           createdAt: Date.now(),
           createdBy: state.myName
@@ -1939,6 +2087,7 @@
           toast("振替授業をシフトに追加しました");
           notifyShiftConfirmed(body, false);
           e.target.reset();
+          resetStudentCheckboxes("mkStudents");
           document.getElementById("mkDate").value = todayStr();
           document.getElementById("mkKoma").value = 1;
         }).catch(function () { toast("追加に失敗しました。もう一度お試しください。", true); });
@@ -2113,8 +2262,9 @@
     var title;
     if (shiftBody.type === "makeup") title = "振替授業が追加されました";
     else title = isEdit ? "シフト内容が更新されました" : "シフトが確定しました";
+    var studentLine = shiftBody.studentIds && shiftBody.studentIds.length ? "\n対象の生徒: " + studentNames(shiftBody.studentIds) : "";
     var body = formatDateJp(shiftBody.date) + " " + timeRange(shiftBody.startTime, shiftBody.endTime) +
-      "(" + shiftBody.komaCount + "コマ)" + (shiftBody.note ? "\n備考: " + shiftBody.note : "");
+      "(" + shiftBody.komaCount + "コマ)" + studentLine + (shiftBody.note ? "\n備考: " + shiftBody.note : "");
     state.db.collection("notifications").add({
       title: title,
       body: body,
@@ -2124,6 +2274,57 @@
       readBy: [],
       emailSent: false
     }).catch(function () {});
+  }
+
+  /* 振替授業の「早い者勝ち募集」に応募する。Firestoreのトランザクションで
+     「まだstatusがopenのときだけ」claimedに書き換え、同時に確定シフトを
+     作成する。すでに他の講師が先に担当していた場合(status !== "open")は
+     トランザクションが失敗し、エラーメッセージを出す。ほぼ同時に複数の
+     講師が押した場合も、Firestore側が自動で片方だけを成功させる。 */
+  function claimMakeupCall(callId) {
+    var callRef = state.db.collection("makeupCalls").doc(callId);
+    var shiftRef = state.db.collection("shifts").doc();
+    state.db.runTransaction(function (transaction) {
+      return transaction.get(callRef).then(function (snap) {
+        if (!snap.exists) { throw new Error("call-not-found"); }
+        var call = snap.data();
+        if (call.status !== "open") { throw new Error("already-claimed"); }
+        var shiftBody = {
+          instructorId: state.instructorId,
+          instructorName: state.myName,
+          date: call.date,
+          startTime: call.startTime,
+          endTime: call.endTime,
+          komaCount: call.komaCount,
+          type: "makeup",
+          studentIds: call.studentIds || [],
+          note: call.note || "",
+          makeupCallId: callId,
+          createdAt: Date.now(),
+          createdBy: state.myName
+        };
+        transaction.update(callRef, {
+          status: "claimed",
+          claimedByInstructorId: state.instructorId,
+          claimedByInstructorName: state.myName,
+          claimedAt: Date.now(),
+          shiftId: shiftRef.id
+        });
+        transaction.set(shiftRef, shiftBody);
+        return shiftBody;
+      });
+    }).then(function (shiftBody) {
+      toast("担当が確定しました");
+      notifyShiftConfirmed(shiftBody, false);
+    }).catch(function (err) {
+      if (err && err.message === "already-claimed") {
+        toast("すでに他の講師が担当しています", true);
+      } else if (err && err.message === "call-not-found") {
+        toast("この募集はすでに削除されています", true);
+      } else {
+        toast("担当の確定に失敗しました。もう一度お試しください。", true);
+      }
+    });
   }
 
   function editShift(id) {
@@ -2254,11 +2455,36 @@
     if (!el) return;
     var list = state.shifts.filter(function (s) { return s.type === "makeup"; }).sort(sortByDateDesc);
     if (list.length === 0) { el.innerHTML = '<div class="empty-state">登録済みの振替授業はまだありません</div>'; return; }
-    el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>日付</th><th>講師</th><th>時間</th><th>コマ数</th><th>備考</th><th></th></tr></thead><tbody>' +
+    el.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>日付</th><th>講師</th><th>時間</th><th>コマ数</th><th>対象の生徒</th><th>備考</th><th></th></tr></thead><tbody>' +
       list.map(function (s) {
-        return "<tr><td>" + esc(formatDateShort(s.date)) + "</td><td>" + esc(s.instructorName) + "</td><td>" + esc(timeRange(s.startTime, s.endTime)) + "</td><td class=\"num\">" + esc(s.komaCount) + "</td><td class=\"cell-note\">" + esc(s.note || "—") + '</td><td><button type="button" class="btn btn-danger btn-sm" data-del-shift="' + esc(s.id) + '">削除</button></td></tr>';
+        var studentCell = s.studentIds && s.studentIds.length ? esc(studentNames(s.studentIds)) : "—";
+        var origin = s.makeupCallId ? '<div class="cell-note" style="margin-top:2px;">(募集への応募)</div>' : "";
+        return "<tr><td>" + esc(formatDateShort(s.date)) + "</td><td>" + esc(s.instructorName) + origin + "</td><td>" + esc(timeRange(s.startTime, s.endTime)) + "</td><td class=\"num\">" + esc(s.komaCount) + "</td><td class=\"cell-note\">" + studentCell + "</td><td class=\"cell-note\">" + esc(s.note || "—") + '</td><td><button type="button" class="btn btn-danger btn-sm" data-del-shift="' + esc(s.id) + '">削除</button></td></tr>';
       }).join("") + "</tbody></table></div>";
     el.querySelectorAll("[data-del-shift]").forEach(function (b) { b.addEventListener("click", function () { onDangerClick(b, "もう一度押すと削除", function () { deleteShift(b.getAttribute("data-del-shift")); }); }); });
+  }
+
+  function updateAdminMakeupCallsOpenList() {
+    var el = document.getElementById("list-makeupCallsOpen");
+    if (!el) return;
+    var open = state.makeupCalls.filter(function (c) { return c.status === "open"; }).sort(sortByDateAsc);
+    if (open.length === 0) { el.innerHTML = '<div class="empty-state">募集中の振替授業はありません</div>'; return; }
+    el.innerHTML = open.map(function (c) {
+      var studentLine = c.studentIds && c.studentIds.length ? '<div class="notice-meta" style="margin-bottom:0;">対象の生徒: ' + esc(studentNames(c.studentIds)) + "</div>" : "";
+      return '<div class="notice-card">' +
+        "<div><strong>" + esc(formatDateJp(c.date)) + '</strong><strong style="margin-left:8px;">' + esc(timeRange(c.startTime, c.endTime)) + "</strong><span class=\"cell-note\" style=\"margin-left:8px;\">" + esc(c.komaCount) + "コマ</span></div>" +
+        studentLine +
+        (c.note ? '<div class="notice-body" style="margin-top:6px;">' + esc(c.note) + "</div>" : "") +
+        '<div class="row-actions" style="margin-top:10px;"><button type="button" class="btn btn-danger btn-sm" data-del-makeup-call="' + esc(c.id) + '">募集を取り消す</button></div>' +
+      "</div>";
+    }).join("");
+    el.querySelectorAll("[data-del-makeup-call]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        onDangerClick(b, "もう一度押すと取り消し", function () {
+          state.db.collection("makeupCalls").doc(b.getAttribute("data-del-makeup-call")).delete().then(function () { toast("募集を取り消しました"); });
+        });
+      });
+    });
   }
 
   function updateApprovalsList() {
