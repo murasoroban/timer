@@ -357,6 +357,21 @@
 
   /* ---------- notices ---------- */
   .nav button .nav-badge { margin-left: auto; background: var(--vermillion); color: #fff; font-size: .66rem; font-weight: 700; border-radius: 999px; padding: 1px 7px; }
+  .manual-toc ol { margin: 6px 0 0; padding-left: 1.4em; }
+  .manual-toc li { margin: 2px 0; }
+  .manual-toc .linklike { font-size: .9rem; text-align: left; }
+  .manual-sec { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; scroll-margin-top: 80px; }
+  .manual-sec summary { cursor: pointer; padding: 14px 16px; font-weight: 700; font-size: .98rem; display: flex; align-items: center; gap: 10px; list-style: none; }
+  .manual-sec summary::-webkit-details-marker { display: none; }
+  .manual-sec summary::after { content: "＋"; margin-left: auto; color: var(--ink-300); font-weight: 400; }
+  .manual-sec[open] summary::after { content: "−"; }
+  .manual-no { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--indigo-soft); color: var(--indigo); font-size: .78rem; display: inline-flex; align-items: center; justify-content: center; }
+  .manual-body { padding: 0 18px 16px; border-top: 1px dashed var(--line); line-height: 1.8; }
+  .manual-body ol, .manual-body ul { padding-left: 1.4em; margin: 12px 0; }
+  .manual-body li { margin-bottom: 6px; }
+  .manual-body p { margin: 12px 0; }
+  .manual-tip { background: var(--amber-soft); border-radius: 9px; padding: 10px 12px; font-size: .88rem; }
+  .manual-tip::before { content: "ポイント: "; font-weight: 700; }
   .notice-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; background: var(--surface); }
   .notice-card.unread { border-color: var(--indigo); background: var(--indigo-soft); }
   .notice-card .notice-title { font-weight: 700; margin-bottom: 4px; }
@@ -441,7 +456,8 @@
     { id: "report", label: "実績提出" },
     { id: "summary", label: "実績・給与目安" },
     { id: "students", label: "生徒情報" },
-    { id: "notices", label: "お知らせ" }
+    { id: "notices", label: "お知らせ" },
+    { id: "manual", label: "使い方マニュアル" }
   ];
   var ADMIN_TABS = [
     { id: "calls", label: "シフト募集・回答確認" },
@@ -450,13 +466,14 @@
     { id: "approvals", label: "実績承認" },
     { id: "students", label: "生徒情報" },
     { id: "notices", label: "お知らせ配信" },
-    { id: "payroll", label: "給与集計・講師管理" }
+    { id: "payroll", label: "給与集計・講師管理" },
+    { id: "manual", label: "使い方マニュアル" }
   ];
 
   /* Bump this string every time this file is edited and republished, so
      viewers already on an older page get a "new version" prompt. Any
      sortable string works (e.g. yyyyMMddHHmm). */
-  var APP_VERSION = "202609211930";
+  var APP_VERSION = "202609212030";
   /* Googleカレンダー連携用のApps Script Webアプリの実行URL(?id=&token=を
      付けて使う)。デプロイ前は空のままにしておくと、同期ボタン自体が
      表示されない。デプロイ後にこの値を埋めて再配布する。 */
@@ -1477,6 +1494,10 @@
       renderStudentsTab(main);
     }
 
+    if (tabId === "manual") {
+      renderManualTab(main);
+    }
+
     if (tabId === "notices") {
       main.innerHTML =
         '<div class="page-head"><h1>お知らせ</h1><p>管理者からのお知らせです。また、ここから管理者へ連絡することもできます。</p></div>' +
@@ -1747,6 +1768,187 @@
   /* =====================================================================
      STUDENTS(生徒情報。講師・管理者どちらの画面からも同じ内容を見る/書ける)
      ===================================================================== */
+  /* ============ 使い方マニュアル ============
+     講師・管理者それぞれ、ログインするとメニューの一番下から読める。
+     見出しをタップすると開閉し、「この画面を開く」で該当のタブへ移動できる。 */
+  var MANUAL_INSTRUCTOR = [
+    { title: "はじめてログインするとき", tab: null, body:
+      "<ol>" +
+        "<li>管理者から、あなたのメールアドレスを登録したと連絡があったら、そろばんシフト帳のページを開きます。</li>" +
+        "<li>「講師の方はこちら」に、<strong>登録してもらったメールアドレス</strong>と、<strong>ご自身で決めたパスワード(6文字以上)</strong>を入れて「ログイン / はじめて登録する」を押します。</li>" +
+        "<li>2回目からは、同じメールアドレスとパスワードでログインできます。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">「登録されていません」と出る場合は、管理者に登録してもらったメールアドレスと違う可能性があります。管理者に確認してください。</p>' },
+    { title: "シフトに回答する", tab: "avail", body:
+      "<ol>" +
+        "<li>メニューの「シフト回答」を開きます。管理者が募集している日時が並んでいます。</li>" +
+        "<li>それぞれの日時で「出勤可能」か「休み希望」を選びます。伝えたいことがあれば備考欄に書きます。</li>" +
+        "<li>「回答を保存する」を押すと回答完了です。回答済みの日には「回答済み」の印がつきます。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">回答は締切日まで何度でも変更できます。締切を過ぎると変更できなくなるので、変更したいときは管理者に連絡してください。</p>' },
+    { title: "振替授業の担当を引き受ける", tab: "avail", body:
+      "<ol>" +
+        "<li>振替授業の募集があると、アプリのお知らせとメールで連絡が届きます。</li>" +
+        "<li>「シフト回答」画面の一番上にある「振替授業の募集」に、日時・対象の生徒が表示されます。</li>" +
+        "<li>担当できる場合は「担当する」を押し、もう一度押すと担当が確定します(間違って押さないよう、2回押す仕組みです)。</li>" +
+        "<li>確定すると「確定シフト一覧」に入り、ほかの講師の画面からはその募集が消えます。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">担当は、先に確定させた講師に決まります。すでにほかの講師に決まっていた場合は、その旨が表示されます。</p>' },
+    { title: "確定したシフトを確認する", tab: "myshifts", body:
+      "<ol>" +
+        "<li>メニューの「確定シフト一覧」を開くと、カレンダーと一覧で確定シフトが見られます。振替授業もここに入ります。</li>" +
+        "<li>カレンダーの日付をタップすると、その日の詳しい内容が見られます。</li>" +
+        "<li>シフトが確定・変更されると、お知らせとメールでも連絡が届きます。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">一覧には振替授業の対象の生徒も表示されます。授業の前に「生徒情報」で級や目標を確認しておくと安心です。</p>' },
+    { title: "勤務の実績を提出する", tab: "report", body:
+      "<ol>" +
+        "<li>勤務した日に、メニューの「実績提出」を開きます。</li>" +
+        "<li>勤務日と、実際に担当したコマ数を入れます。対応する確定シフトがあれば選び、伝えたいことがあれば備考に書きます。</li>" +
+        "<li>「実績を提出する」を押します。管理者が承認すると給与の計算に入ります。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">右側の「提出履歴」で、承認されたかどうかを確認できます。差し戻された場合は理由が表示されるので、内容を直してもう一度提出してください。</p>' },
+    { title: "実績と給与の目安を見る", tab: "summary", body:
+      "<p>メニューの「実績・給与目安」で、承認された実績のコマ数と、給与の目安を確認できます。あくまで目安なので、正式な金額は管理者からの給与確定のお知らせでご確認ください。</p>" },
+    { title: "生徒の情報を見る・共有する", tab: "students", body:
+      "<ol>" +
+        "<li>メニューの「生徒情報」で、生徒ごとの珠算・暗算の級と「目標・指導のポイント」が見られます。授業の前に確認しておくと安心です。</li>" +
+        "<li>生徒は五十音順に並んでいます。上の検索欄に名前やふりがなを入れると探せます。</li>" +
+        "<li>級や目標が変わったら、その欄を書き換えて欄の外をタップすると保存されます。</li>" +
+        "<li>「詳しく見る」を押すと、ほかの講師が書いた記録と、それをAIがまとめた要約が見られます。授業の様子を書いて「送信する」を押すと、全講師に共有されます。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">ここに書いた内容は全講師が見られます。生徒や保護者に見せられない書き方は避けてください。</p>' },
+    { title: "お知らせを見る・管理者へ連絡する", tab: "notices", body:
+      "<ol>" +
+        "<li>管理者からのお知らせは、メニューの「お知らせ」で見られます。未読があるとメニューに印がつきます。同じ内容はメールでも届きます。</li>" +
+        "<li>管理者に伝えたいことは、同じ画面の「管理者へ連絡する」に書いて「送信する」を押します。</li>" +
+      "</ol>" },
+    { title: "スマホで使うとき", tab: null, body:
+      "<p>スマホでは、画面左上の「≡」ボタンを押すとメニューが開きます。ホーム画面にこのページを追加しておくと、アプリのようにすぐ開けて便利です(Safariなら共有ボタン→「ホーム画面に追加」)。</p>" },
+    { title: "困ったとき", tab: null, body:
+      "<ul>" +
+        "<li><strong>パスワードを忘れた:</strong> ログイン画面の「パスワードを忘れた方はこちら」から、再設定用のメールを受け取れます。</li>" +
+        "<li><strong>メールが届かない:</strong> 迷惑メールフォルダも確認してください。メールはお知らせから数分〜10分ほど遅れて届きます。</li>" +
+        "<li><strong>画面の表示がおかしい:</strong> ページを再読み込みしてください。新しい版が出ているときは、画面の上に案内が表示されます。</li>" +
+        "<li>それでも解決しないときは、「お知らせ」画面の「管理者へ連絡する」から連絡してください。</li>" +
+      "</ul>" }
+  ];
+
+  var MANUAL_ADMIN = [
+    { title: "最初の準備:講師を登録する", tab: "payroll", body:
+      "<ol>" +
+        "<li>メニューの「給与集計・講師管理」を開きます。</li>" +
+        "<li>「講師の登録・単価設定」に、講師名・メールアドレス・1コマあたりの単価を入れて「講師を追加」を押します。</li>" +
+        "<li>講師本人に、ページのアドレス(https://soroban-shift.pages.dev)と、登録したメールアドレスを伝えます。講師がそのメールアドレスとお好きなパスワードでログインすると、一覧の表示が「未登録」から「登録済み」に変わります。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">辞めた講師は「無効にする」を押すと、シフトの選択肢などから外れます(これまでの記録は残ります)。単価は一覧から後で変更できます。</p>' },
+    { title: "シフトを募集して、回答を確認する", tab: "calls", body:
+      "<ol>" +
+        "<li>メニューの「シフト募集・回答確認」を開きます。</li>" +
+        "<li>日付・時間、必要なら回答締切日と備考を入れて「この日時で募集する」を押すと、講師の「シフト回答」画面に表示されます。</li>" +
+        "<li>右側の一覧で、募集ごとに「出勤可能」「休み希望」「未回答」の件数と、誰がどう答えたかを確認できます。</li>" +
+        "<li>出勤可能と答えた講師の横の「シフトを作成」を押すと、日時と講師が入った状態でシフト作成画面に移ります。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">回答締切日を過ぎると、講師は回答を変更できなくなります。</p>' },
+    { title: "シフトを確定する・直す", tab: "shifts", body:
+      "<ol>" +
+        "<li>メニューの「シフト一覧・作成」で、講師・日付・時間・コマ数を入れて「シフトを作成する」を押すと、確定シフトになります。</li>" +
+        "<li>確定すると、その講師にお知らせとメールで連絡が届きます。</li>" +
+        "<li>一覧の「編集」で内容を直したり、「削除」で取り消したりできます(削除はボタンを2回押すと実行されます)。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">上のカレンダーで、全体のシフトの入り具合をひと目で確認できます。「講師で絞り込み」で特定の講師だけ表示することもできます。</p>' },
+    { title: "振替授業を追加する", tab: "makeup", body:
+      "<p>振替授業は、次のどちらかの方法で追加します。</p>" +
+      "<p><strong>A. 講師に担当を募集する(担当が決まっていないとき)</strong></p>" +
+      "<ol>" +
+        "<li>「講師に担当を募集する」に、振替日・時間・コマ数を入れ、対象の生徒を選びます(複数選べます。生徒が多いときは検索欄で探せます)。</li>" +
+        "<li>「この内容で募集する」を押すと、全講師にお知らせとメールが届きます。</li>" +
+        "<li>最初に「担当する」を確定させた講師に決まり、自動で確定シフトに入ります。担当が決まるまでは「募集中の振替授業」に表示され、「募集を取り消す」で取り消せます。</li>" +
+      "</ol>" +
+      "<p><strong>B. 担当講師を直接指定する(すでに担当が決まっているとき)</strong></p>" +
+      "<ol>" +
+        "<li>「担当講師を直接指定して追加する」で講師・日時・コマ数・生徒を選び、「振替授業として追加する」を押します。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">追加した振替授業は「登録済みの振替授業」に並びます。募集から決まったものには「(募集への応募)」と表示されます。</p>' },
+    { title: "実績を承認する", tab: "approvals", body:
+      "<ol>" +
+        "<li>講師が実績を提出すると、メニューの「実績承認」に「承認待ち」として並びます。</li>" +
+        "<li>内容が正しければ「承認」を押します。承認した実績だけが給与の計算に入ります。</li>" +
+        "<li>内容に誤りがあれば「差し戻し」を押し、理由を書いて「差し戻す」を押します。講師に理由付きで連絡が届きます。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">上の「表示」を「すべて」にすると、承認済み・差し戻し済みのものも確認できます。間違えて承認したときは「承認待ちに戻す」で戻せます。</p>' },
+    { title: "給与を集計・確定する", tab: "payroll", body:
+      "<ol>" +
+        "<li>メニューの「給与集計・講師管理」の「月別給与集計」で、対象の月を選びます。</li>" +
+        "<li>講師ごとの承認済みコマ数と給与額が表示されます。</li>" +
+        "<li>内容を確認したら「この月の給与を確定して通知する」を押し、もう一度押すと確定します。各講師に、その月のコマ数と給与額のお知らせ・メールが届きます。</li>" +
+        "<li>「CSVをダウンロード」を押すと、Excelなどで開ける一覧表をダウンロードできます。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">給与を確定する前に、その月の実績の「承認待ち」が残っていないか「実績承認」で確認しておくと安心です。</p>' },
+    { title: "生徒情報を管理する", tab: "students", body:
+      "<ol>" +
+        "<li>メニューの「生徒情報」で、生徒名・ふりがな・珠算と暗算の級・目標を入れて「登録する」を押します。ふりがなを入れておくと五十音順に並び、検索もしやすくなります。</li>" +
+        "<li>級や「目標・指導のポイント」は、一覧の欄を書き換えて欄の外をクリックすると保存されます。講師全員が同じように編集できます。</li>" +
+        "<li>「詳しく見る」で、講師が共有した記録と、直近5件からAIが作った要約が見られます。</li>" +
+        "<li>退塾した生徒は「削除」で消せます(削除できるのは管理者だけです)。</li>" +
+      "</ol>" +
+      '<p class="manual-tip">生徒情報は、1日1回「そろばんシフト帳 生徒情報」というGoogleスプレッドシートにも、生徒ごとのシートで自動で書き出されます。</p>' },
+    { title: "お知らせを送る・講師からの連絡を見る", tab: "notices", body:
+      "<ol>" +
+        "<li>メニューの「お知らせ配信」で、送信先(すべての講師 または 特定の講師)・件名・本文を入れて「送信する」を押します。</li>" +
+        "<li>アプリ内のお知らせに加えて、数分〜10分ほどで講師のメールにも届きます。</li>" +
+        "<li>送ったお知らせの一覧では、何人が読んだか(既読の数)を確認できます。</li>" +
+        "<li>画面上の「講師からの連絡」に、講師から届いた連絡が並びます。</li>" +
+      "</ol>" },
+    { title: "困ったとき", tab: null, body:
+      "<ul>" +
+        "<li><strong>講師がログインできない:</strong> 「給与集計・講師管理」に登録したメールアドレスと、講師が入力しているメールアドレスが同じか確認してください。パスワードを忘れた場合は、ログイン画面の「パスワードを忘れた方はこちら」から本人が再設定できます。</li>" +
+        "<li><strong>ご自身のパスワードを変えたい:</strong> 「給与集計・講師管理」の「パスワード再設定メールを送る」を押すと、再設定用のメールが届きます。</li>" +
+        "<li><strong>メールが届かない:</strong> メールは数分〜10分ほど遅れて届きます。講師に迷惑メールフォルダも確認してもらってください。</li>" +
+        "<li><strong>管理者を増やしたい:</strong> 「給与集計・講師管理」の「管理者アカウント」に書いてある手順で追加できます。わからない場合は開発担当に相談してください。</li>" +
+        "<li><strong>画面の表示がおかしい:</strong> ページを再読み込みしてください。新しい版を公開したときは、開いている画面の上に案内が表示されます。</li>" +
+      "</ul>" }
+  ];
+
+  function renderManualTab(main) {
+    var isAdmin = state.role === "admin";
+    var sections = isAdmin ? MANUAL_ADMIN : MANUAL_INSTRUCTOR;
+    var tabs = isAdmin ? ADMIN_TABS : INSTRUCTOR_TABS;
+    function tabLabel(id) { var t = tabs.filter(function (x) { return x.id === id; })[0]; return t ? t.label : ""; }
+
+    main.innerHTML =
+      '<div class="page-head"><h1>使い方マニュアル(' + (isAdmin ? "管理者用" : "講師用") + ')</h1>' +
+        "<p>見出しを押すと、くわしい手順が開きます。「この画面を開く」を押すと、その機能の画面に移動します。</p></div>" +
+      '<div class="card manual-toc"><h2>もくじ</h2><ol>' +
+        sections.map(function (sec, i) {
+          return '<li><button type="button" class="linklike" data-manual-jump="' + i + '">' + esc(sec.title) + "</button></li>";
+        }).join("") +
+      "</ol></div>" +
+      sections.map(function (sec, i) {
+        return '<details class="manual-sec" id="manualSec' + i + '"' + (i === 0 ? " open" : "") + ">" +
+          "<summary><span class=\"manual-no\">" + (i + 1) + "</span>" + esc(sec.title) + "</summary>" +
+          '<div class="manual-body">' + sec.body +
+            (sec.tab ? '<button type="button" class="btn btn-outline btn-sm" data-manual-goto="' + esc(sec.tab) + '">「' + esc(tabLabel(sec.tab)) + "」の画面を開く</button>" : "") +
+          "</div>" +
+        "</details>";
+      }).join("");
+
+    main.querySelectorAll("[data-manual-jump]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var d = document.getElementById("manualSec" + b.getAttribute("data-manual-jump"));
+        if (!d) return;
+        d.open = true;
+        d.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+    main.querySelectorAll("[data-manual-goto]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        switchTab(b.getAttribute("data-manual-goto"));
+        window.scrollTo(0, 0);
+      });
+    });
+  }
+
   function renderStudentsTab(main) {
     main.innerHTML =
       '<div class="page-head"><h1>生徒情報</h1><p>生徒ごとの珠算・暗算の級や、講師どうしで共有したい様子を記録します。ここに書いた内容は全講師が見られます。</p></div>' +
@@ -2165,6 +2367,10 @@
       renderStudentsTab(main);
     }
 
+    if (tabId === "manual") {
+      renderManualTab(main);
+    }
+
     if (tabId === "notices") {
       main.innerHTML =
         '<div class="page-head"><h1>お知らせ配信</h1><p>講師にお知らせを送ります。「すべての講師」を選ぶと全員に、講師を選ぶとその方だけに届きます。</p></div>' +
@@ -2215,7 +2421,7 @@
         "</div>" +
         '<div class="card">' +
           "<h2>講師の登録・単価設定</h2>" +
-          '<p class="card-sub">メールアドレスは、その講師がログインアカウントを作成するときに使います。ここで登録した後、講師本人がログイン画面で自分の名前を選び、パスワードを決めてアカウントを作成します。</p>' +
+          '<p class="card-sub">メールアドレスは、その講師がログインアカウントを作成するときに使います。ここで登録した後、講師本人がログイン画面の「講師の方はこちら」に、このメールアドレスとお好きなパスワードを入れて送信すると、アカウントが作成されます。</p>' +
           '<form id="instructorForm" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">' +
             '<div class="field" style="flex:1;min-width:160px;margin-bottom:0;"><label for="newInstName">講師名</label><input type="text" id="newInstName" placeholder="例: 田中先生" required maxlength="30"></div>' +
             '<div class="field" style="flex:1;min-width:200px;margin-bottom:0;"><label for="newInstEmail">メールアドレス</label><input type="email" id="newInstEmail" placeholder="例: tanaka@example.com" required></div>' +
@@ -2701,7 +2907,7 @@
           '<button type="button" class="btn btn-danger btn-sm" data-del-inst="' + esc(i.id) + '">削除</button>' +
           "</td></tr>";
       }).join("") + "</tbody></table></div>" +
-      '<p class="hint" style="margin-top:10px;">「未登録」の講師は、まだご自身でアカウントを作成していません。ログイン画面でお名前を選んでパスワードを決めていただくと「登録済み」になります。登録済みの方のメールアドレスをここで書き換えても、ログイン用のメールアドレスは変わりません(連絡先メモとしてのみ使われます)。</p>';
+      '<p class="hint" style="margin-top:10px;">「未登録」の講師は、まだご自身でアカウントを作成していません。ログイン画面で登録したメールアドレスとお好きなパスワードを入れていただくと「登録済み」になります。登録済みの方のメールアドレスをここで書き換えても、ログイン用のメールアドレスは変わりません(連絡先メモとしてのみ使われます)。</p>';
     el.querySelectorAll(".emailInput").forEach(function (inp) {
       inp.addEventListener("change", function () {
         var v = inp.value.trim();
